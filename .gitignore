@@ -1,0 +1,8 @@
+*.fasl
+*.dx64fsl
+*.lx64fsl
+*.wx64fsl
+*~
+.qlot/
+system-index.txt
+.cl-repository/
