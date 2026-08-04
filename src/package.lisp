@@ -50,6 +50,14 @@
    #:parse-netrc
    #:netrc-auth-for-url
    #:compute-digest-authorization
+   ;; CLOS auth protocol (OAuth2 → cl-stack-oauth2; JWT crypto → cl-stack-jwt)
+   #:*auth-in-flight*
+   #:auth-object
+   #:auth-object-p
+   #:prepare-auth
+   #:handle-auth-response
+   #:auth-retry-p
+   #:copy-request-with-auth
    ;; session
    #:http-session
    #:http-session-p

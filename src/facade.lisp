@@ -96,13 +96,13 @@
    - :JSON → :DATA + :DATA-TYPE :JSON
    - :CERT client certificate (stored on :extras)
    - :TRUST-ENV T → env/system proxy + ~/.netrc basic auth when :AUTH omitted
-   - :AUTH (:DIGEST user pass) → 401 challenge retry
+   - :AUTH (:DIGEST user pass) → 401 challenge retry (CLOS auth protocol)
+   - :AUTH AUTH-OBJECT (e.g. cl-stack-oauth2:oauth2-auth) → PREPARE-AUTH + HANDLE-AUTH-RESPONSE
    - path / httpx file tuples in :FILES / :CONTENT"
   (let* ((backend (if backendp backend (ensure-http-backend preferred)))
          (*http-backend* backend)
          (auth (%resolve-auth auth url trust-env))
-         (digestp (digest-auth-p auth))
-         (wire-auth (unless digestp auth))
+         (managedp (auth-object-p auth))
          (proxy (%resolve-proxy (getf keys :proxy) trust-env))
          (http-keys (%prepare-keys
                      (remove-from-plist keys :backend :preferred :slurp
@@ -113,28 +113,33 @@
                      :default-params default-params))
          (http-keys (let ((k (copy-list http-keys)))
                       (when proxy (setf (getf k :proxy) proxy))
-                      (when wire-auth (setf (getf k :auth) wire-auth))
                       k)))
     (with-default-codecs ()
-      (if digestp
+      (if managedp
           (let* ((client (if clientp
                              client
                              (or *http-client* (make-http-client backend))))
-                 (req (%plist-to-request method url http-keys))
+                 (req0 (%plist-to-request method url http-keys))
+                 (wire (prepare-auth auth req0))
+                 (req (if wire (copy-request-with-auth req0 wire
+                                                       :raise-for-status nil)
+                          req0))
                  (res (send backend client req))
-                 (final (%finish-digest backend client req res auth)))
+                 (final (handle-auth-response auth backend client req res)))
             (when raise-for-status
               (raise-for-status final))
             final)
-          (apply #'http:request method url
-                 :backend backend
-                 :raise-for-status raise-for-status
-                 (append (when clientp (list :client client))
-                         http-keys))))))
-
-(defun %finish-digest (backend client request response auth)
-  (or (retry-with-digest backend client request response auth)
-      response))
+          (let* ((wire (prepare-auth auth nil))
+                 (http-keys (if wire
+                                (let ((k (copy-list http-keys)))
+                                  (setf (getf k :auth) wire)
+                                  k)
+                                http-keys)))
+            (apply #'http:request method url
+                   :backend backend
+                   :raise-for-status raise-for-status
+                   (append (when clientp (list :client client))
+                           http-keys)))))))
 
 (defun get (url &rest keys &key &allow-other-keys)
   (apply #'request :get url keys))
@@ -167,11 +172,11 @@
                         default-params
                       &allow-other-keys)
   "Async request → Blackbird promise of HTTP-RESPONSE.
-   Digest 401 retry is sync-only."
+   HANDLE-AUTH-RESPONSE (Digest/OAuth2 401 retry) is sync-only; PREPARE-AUTH runs."
   (let* ((backend (if backendp backend (ensure-http-backend preferred)))
          (*http-backend* backend)
          (auth (%resolve-auth auth url trust-env))
-         (wire-auth (unless (digest-auth-p auth) auth))
+         (wire-auth (prepare-auth auth nil))
          (proxy (%resolve-proxy (getf keys :proxy) trust-env))
          (http-keys (%prepare-keys
                      (remove-from-plist keys :backend :preferred :slurp

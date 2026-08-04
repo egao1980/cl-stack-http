@@ -9,7 +9,8 @@
                "babel"
                "yason"
                "trivial-mimes"
-               "quri")
+               "quri"
+               "cl-base64")
   :serial t
   :pathname "src"
   :components ((:file "package")
@@ -18,6 +19,7 @@
                (:file "mime")
                (:file "path-io")
                (:file "auth")
+               (:file "auth-protocol")
                (:file "response")
                (:file "facade")
                (:file "session"))

@@ -7,6 +7,16 @@ backends, JSON + S-expression serdes, and
 
 Package: `cl-stack-http` (nick `stack-http`).
 
+**Auth layering** (Python-shaped):
+
+| Concern | Package |
+|---------|---------|
+| Wire `:basic` / `:bearer`, Digest, netrc, CLOS auth protocol | this package |
+| OAuth2 get/refresh/scopes/PKCE/401 retry | [`cl-stack-oauth2`](https://github.com/egao1980/cl-stack-oauth2) |
+| JWT encode/decode/verify | [`cl-stack-jwt`](https://github.com/egao1980/cl-stack-jwt) (jose) |
+
+CLOS protocol: `auth-object-p` / `prepare-auth` / `handle-auth-response` (see `src/auth-protocol.lisp`).
+
 ## Install
 
 ```lisp

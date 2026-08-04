@@ -34,3 +34,9 @@
   (multiple-value-bind (c k) (normalize-cert '(#p"/c.pem" #p"/k.pem"))
     (ok (equal #p"/c.pem" c))
     (ok (equal #p"/k.pem" k))))
+
+(deftest auth-protocol-wire-passthrough
+  (ok (null (auth-object-p '(:basic "u" "p"))))
+  (ok (equal '(:bearer "t") (prepare-auth '(:bearer "t") nil)))
+  (ok (auth-object-p (digest-auth "u" "p")))
+  (ok (null (prepare-auth (digest-auth "u" "p") nil))))
