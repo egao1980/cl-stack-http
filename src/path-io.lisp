@@ -114,13 +114,12 @@
       ((streamp body) (slurp-octets body))
       (t (slurp-octets (body-stream response))))))
 
-(defun %write-download (dest octets &key overwrite create-parents)
-  "Write OCTETS to DEST path. Honours overwrite / create-parents policy."
+(defun %with-download-write-policy (dest overwrite create-parents thunk)
+  "Run THUNK under create-parents / overwrite policy for DEST."
   (flet ((do-write ()
-           (let ((thunk (lambda () (path:write-bytes dest octets))))
-             (if create-parents
-                 (path:with-auto-create-parents () (funcall thunk))
-                 (funcall thunk)))))
+           (if create-parents
+               (path:with-auto-create-parents () (funcall thunk))
+               (funcall thunk))))
     (cond
       ((not (path:exists-p dest))
        (do-write))
@@ -136,6 +135,49 @@
            :report "Overwrite existing file"
            (path:with-auto-overwrite () (do-write)))))))
   dest)
+
+(defun %write-download (dest octets &key overwrite create-parents)
+  "Write OCTETS to DEST path. Honours overwrite / create-parents policy."
+  (%with-download-write-policy
+   dest overwrite create-parents
+   (lambda () (path:write-bytes dest octets))))
+
+(defun %write-download-stream (dest input &key overwrite create-parents
+                               (buffer-size *http-stream-buffer-size*))
+  "Copy INPUT stream to DEST in BUFFER-SIZE chunks (O(buffer), not O(body))."
+  (let ((buf (make-array buffer-size :element-type '(unsigned-byte 8)))
+        (first t))
+    (%with-download-write-policy
+     dest overwrite create-parents
+     (lambda ()
+       (loop for n = (read-sequence buf input)
+             while (plusp n)
+             do (let ((chunk (if (= n buffer-size)
+                                 buf
+                                 (subseq buf 0 n))))
+                  (if first
+                      (progn
+                        (path:write-bytes dest chunk)
+                        (setf first nil))
+                      (path:write-bytes dest chunk :append t)))
+             finally (when first
+                       (path:write-bytes dest #()))))))
+  dest)
+
+(defun %persist-response-body (dest response &key overwrite create-parents)
+  "Write RESPONSE body to DEST. Streams when body is a stream (no full slurp)."
+  (let ((body (response-body response)))
+    (unwind-protect
+         (cond
+           ((streamp body)
+            (%write-download-stream dest body
+                                    :overwrite overwrite
+                                    :create-parents create-parents))
+           (t
+            (%write-download dest (%response-octets response)
+                             :overwrite overwrite
+                             :create-parents create-parents)))
+      (ignore-errors (close-response response)))))
 
 (defun %basename-from-url (url)
   "Last path segment of URL, or \"download\"."
@@ -186,8 +228,9 @@
                    (create-parents t)
                    (filename nil)
                  &allow-other-keys)
-  "GET URL and write body octets to PATH (pathlib). Returns (values path response).
+  "GET URL and stream body to PATH (pathlib). Returns (values path response).
 
+   Uses `:want-stream t` so peak Lisp memory stays O(buffer), not O(body).
    If PATH is a directory (trailing slash / existing dir), the file name comes
    from Content-Disposition (filename / filename*), else the URL basename.
    FILENAME string overrides; T / :content-disposition requires a CD name."
@@ -205,14 +248,37 @@
          (*http-backend* backend)
          (path:*filesystem* (or filesystem path:*filesystem*))
          (dest (path:ensure-path path))
-         (response (apply #'http:get url :force-binary t
+         (response (apply #'http:get url :force-binary t :want-stream t
                           :backend backend http-keys))
          (final (resolve-download-path dest response
                                        :filename filename :url url)))
-    (values (%write-download final (%response-octets response)
-                             :overwrite overwrite
-                             :create-parents create-parents)
+    (values (%persist-response-body final response
+                                    :overwrite overwrite
+                                    :create-parents create-parents)
             response)))
+
+(defun %normalize-download-pair (entry)
+  "Normalize ENTRY to (values url path). Accepts (url . path) or (url path)."
+  (cond
+    ((and (consp entry) (not (consp (cdr entry))))
+     (values (car entry) (cdr entry)))
+    ((and (consp entry) (alexandria:proper-list-p entry) (= 2 (length entry)))
+     (values (first entry) (second entry)))
+    (t (error 'http-protocol-error
+              :message (format nil "download-many entry must be (url . path) or (url path), got ~S"
+                               entry)))))
+
+(defun download-many (pairs &rest keys)
+  "Download PAIRS sequentially. Each entry is (url . path) or (url path).
+
+   Same keyword args as DOWNLOAD (`:overwrite`, `:filesystem`, …).
+   Returns a list of (path . response) in input order."
+  (mapcar (lambda (entry)
+            (multiple-value-bind (url path) (%normalize-download-pair entry)
+              (multiple-value-bind (final response)
+                  (apply #'download url path keys)
+                (cons final response))))
+          pairs))
 
 (defun upload (path url &rest keys
                &key (method :post) (backend nil backendp) client
@@ -271,14 +337,14 @@
          (path:*filesystem* (or filesystem path:*filesystem*))
          (dest (path:ensure-path path)))
     (blackbird:attach
-     (apply #'http:get-async url :force-binary t
+     (apply #'http:get-async url :force-binary t :want-stream t
             :backend backend http-keys)
      (lambda (response)
        (let ((final (resolve-download-path dest response
                                            :filename filename :url url)))
-         (cons (%write-download final (%response-octets response)
-                                :overwrite overwrite
-                                :create-parents create-parents)
+         (cons (%persist-response-body final response
+                                       :overwrite overwrite
+                                       :create-parents create-parents)
                response))))))
 
 (defun upload-async (path url &rest keys

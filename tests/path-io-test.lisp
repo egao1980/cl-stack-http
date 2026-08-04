@@ -25,6 +25,22 @@
     (ok (http-file-p (cdr (first files))))
     (ok (equalp #(1 2 3) (http-file-content (cdr (first files)))))))
 
+(deftest coerce-files-multi-field
+  "cl-stack#73: multiple file fields → distinct http-file values."
+  (let* ((fs (path:make-memory-filesystem))
+         (path:*filesystem* fs)
+         (a (path:path "/a.txt"))
+         (b (path:path "/b.txt")))
+    (path:with-auto-create-parents ()
+      (path:write-text a "one")
+      (path:write-text b "two"))
+    (let ((files (coerce-files `(("fa" . ,a) ("fb" . ,b)) :filesystem fs)))
+      (ok (= 2 (length files)))
+      (ok (string= "fa" (car (first files))))
+      (ok (string= "fb" (car (second files))))
+      (ok (string= "a.txt" (http-file-filename (cdr (first files)))))
+      (ok (string= "b.txt" (http-file-filename (cdr (second files))))))))
+
 (deftest write-download-overwrite-policy
   (let* ((fs (path:make-memory-filesystem))
          (path:*filesystem* fs)
@@ -35,6 +51,56 @@
                  'path:path-exists-error))
     (cl-stack-http::%write-download dest #(1 2) :overwrite t :create-parents t)
     (ok (equalp #(1 2) (path:read-bytes dest)))))
+
+(deftest write-download-stream-chunked
+  "Streamed persist uses fixed buffer + append (O(buffer))."
+  (let* ((fs (path:make-memory-filesystem))
+         (path:*filesystem* fs)
+         (dest (path:path "/out/stream.bin"))
+         (src (make-octet-input-stream #(1 2 3 4 5 6 7 8))))
+    (cl-stack-http::%write-download-stream dest src
+                                           :overwrite t
+                                           :create-parents t
+                                           :buffer-size 3)
+    (ok (equalp #(1 2 3 4 5 6 7 8) (path:read-bytes dest)))))
+
+(deftest normalize-download-pair
+  (multiple-value-bind (u p)
+      (cl-stack-http::%normalize-download-pair '("https://x/a" . #p"/tmp/a"))
+    (ok (string= "https://x/a" u))
+    (ok (equal #p"/tmp/a" p)))
+  (multiple-value-bind (u p)
+      (cl-stack-http::%normalize-download-pair '("https://x/b" #p"/tmp/b"))
+    (ok (string= "https://x/b" u))
+    (ok (equal #p"/tmp/b" p)))
+  (ok (signals (cl-stack-http::%normalize-download-pair '("bad"))
+               'http-protocol-error)))
+
+(deftest download-many-sequential
+  "download-many walks pairs in order and returns (path . response) alist."
+  (let* ((calls nil)
+         (r1 (make-instance 'http-response :status 200 :body #(1)))
+         (r2 (make-instance 'http-response :status 200 :body #(2)))
+         (orig (fdefinition 'cl-stack-http:download)))
+    (unwind-protect
+         (progn
+           (setf (fdefinition 'cl-stack-http:download)
+                 (lambda (url path &rest keys)
+                   (declare (ignore keys))
+                   (setf calls (nconc calls (list (list url path))))
+                   (values (path:ensure-path path)
+                           (if (search "/a" url) r1 r2))))
+           (let ((out (download-many
+                       `(("https://x/a.bin" . ,(path:path "/tmp/a.bin"))
+                         ("https://x/b.bin" ,(path:path "/tmp/b.bin")))
+                       :overwrite t)))
+             (ok (= 2 (length out)))
+             (ok (= 2 (length calls)))
+             (ok (search "/a.bin" (first (first calls))))
+             (ok (search "/b.bin" (first (second calls))))
+             (ok (equalp #(1) (response-body (cdr (first out)))))
+             (ok (equalp #(2) (response-body (cdr (second out)))))))
+      (setf (fdefinition 'cl-stack-http:download) orig))))
 
 (deftest guess-content-type-json
   (ok (string= "application/json" (guess-content-type "foo.json"))))

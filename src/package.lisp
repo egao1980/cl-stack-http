@@ -28,6 +28,7 @@
    #:coerce-files
    #:effective-slurp
    #:download
+   #:download-many
    #:upload
    #:download-async
    #:upload-async
