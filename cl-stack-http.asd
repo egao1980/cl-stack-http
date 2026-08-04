@@ -1,5 +1,5 @@
 (defsystem "cl-stack-http"
-  :version "0.1.0"
+  :version "0.1.1"
   :description "requests/httpx-like HTTP client over http-protocol (JSON/sexp, pathlib FS, selectable backends)"
   :author "egao1980"
   :license "MIT"
@@ -8,7 +8,9 @@
                "alexandria"
                "babel"
                "yason"
-               "trivial-mimes")
+               "trivial-mimes"
+               "quri"
+               "cl-base64")
   :serial t
   :pathname "src"
   :components ((:file "package")
@@ -16,6 +18,9 @@
                (:file "codecs")
                (:file "mime")
                (:file "path-io")
+               (:file "auth")
+               (:file "auth-protocol")
+               (:file "response")
                (:file "facade")
                (:file "session"))
   :in-order-to ((test-op (test-op "cl-stack-http/tests"))))
@@ -28,6 +33,9 @@
                (:file "codecs-test")
                (:file "path-io-test")
                (:file "backend-test")
-               (:file "session-test"))
+               (:file "session-test")
+               (:file "response-test")
+               (:file "auth-test")
+               (:file "dx-test"))
   :perform (test-op (o c)
              (symbol-call :rove :run c)))

@@ -25,7 +25,7 @@
                         out)))))))
 
 (let* ((name "cl-stack-http")
-       (version (env "PKG_VERSION" "0.1.0"))
+       (version (env "PKG_VERSION" "0.1.1"))
        (source-dir (uiop:ensure-directory-pathname
                     (env "PKG_SOURCE_DIR" (namestring (uiop:getcwd)))))
        (_ (sync-asdf-version! source-dir version))
@@ -45,7 +45,7 @@
                :description "requests/httpx-like HTTP client over http-protocol"
                :author "egao1980"
                :depends-on '("http-protocol" "cl-stack-pathlib" "alexandria"
-                             "babel" "yason" "trivial-mimes")
+                             "babel" "yason" "trivial-mimes" "quri")
                :provides '("cl-stack-http")))
        (result (cl-repository-packager/build-matrix:build-package spec)))
   (declare (ignore _))

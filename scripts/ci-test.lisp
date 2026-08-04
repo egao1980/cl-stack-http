@@ -39,7 +39,8 @@
  (lambda ()
    (dolist (n '("rove" "alexandria" "babel" "yason" "trivial-mimes"
                 "blackbird" "cl-cookie" "dexador" "chipz" "salza2"
-                "cl-unicode" "bordeaux-threads" "trivial-gray-streams"))
+                "cl-unicode" "bordeaux-threads" "trivial-gray-streams"
+                "ironclad" "quri"))
      (unless (asdf:find-system n nil)
        (format t "~&; ci: ql fallback ~a~%" n)
        (ql:quickload n :silent t)))
