@@ -158,10 +158,14 @@
    FILENAME — string → use it; T / :content-disposition → require CD name;
    NIL → if DEST is a directory, use Content-Disposition filename (RFC 6266),
    else DEST as-is. Falls back to URL basename when DEST is a directory and
-   no CD name is present."
+   no CD name is present.
+
+   When the chosen name has no extension, append one from the response
+   Content-Type (trivial-mimes), e.g. application/json → `.json`."
   (let* ((dest (path:ensure-path dest))
          (cd (content-disposition-filename
               (response-header response "content-disposition")))
+         (ct (response-header response "content-type"))
          (dirp (%directory-download-dest-p dest))
          (name (cond
                  ((stringp filename) filename)
@@ -170,7 +174,8 @@
                       (error 'http-protocol-error
                              :message "Content-Disposition filename missing")))
                  (dirp (or cd (and url (%basename-from-url url)) "download"))
-                 (t nil))))
+                 (t nil)))
+         (name (when name (ensure-filename-extension name ct))))
     (if name
         (path:join dest name)
         dest)))
