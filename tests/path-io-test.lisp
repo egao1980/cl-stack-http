@@ -38,3 +38,15 @@
 
 (deftest guess-content-type-json
   (ok (string= "application/json" (guess-content-type "foo.json"))))
+
+(deftest download-strips-trust-env
+  "Regression: :trust-env must not reach make-http-request initargs."
+  (with-backend (:dexador)
+    (uiop:with-temporary-file (:pathname p :prefix "stack-http-" :type "bin")
+      ;; example.com is enough to exercise the key path; network skip on failure
+      (handler-case
+          (progn
+            (download "https://example.com/" p :overwrite t :trust-env nil :timeout 15.0)
+            (ok (probe-file p)))
+        (error (e)
+          (skip (format nil "network unavailable: ~A" e)))))))

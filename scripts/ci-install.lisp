@@ -69,7 +69,7 @@
 
 (call-with-ci-muffles
  (lambda ()
-   (ci-fetch "http-protocol" :version "0.2.0")
+   (ci-fetch "http-protocol" :version "0.2.1")
    (ci-fetch "cl-stack-pathlib" :version "0.1.1")
    (ci-fetch "http-backend-dexador" :version "0.1.1")
    (ci-fetch "http-encoding-chipz")

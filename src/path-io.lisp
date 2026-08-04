@@ -144,13 +144,20 @@
                  &allow-other-keys)
   "GET URL and write body octets to PATH (pathlib). Returns (values path response)."
   (declare (ignore client))
-  (let* ((http-keys (remove-from-plist keys :overwrite :filesystem :create-parents
-                                            :backend))
+  (let* ((trust-env (getf keys :trust-env t))
+         (http-keys (remove-from-plist keys :overwrite :filesystem :create-parents
+                                            :backend :preferred :trust-env :cert
+                                            :slurp :default-params :raise-for-status))
+         (http-keys (if (and trust-env
+                             (eq (getf http-keys :proxy :%missing) :%missing))
+                        (list* :proxy (make-http-proxy-config :system t) http-keys)
+                        http-keys))
          (backend (if backendp backend (ensure-http-backend)))
          (*http-backend* backend)
          (path:*filesystem* (or filesystem path:*filesystem*))
          (dest (path:ensure-path path))
-         (response (apply #'http:get url :force-binary t http-keys)))
+         (response (apply #'http:get url :force-binary t
+                          :backend backend http-keys)))
     (values (%write-download dest (%response-octets response)
                              :overwrite overwrite
                              :create-parents create-parents)
@@ -163,8 +170,15 @@
                &allow-other-keys)
   "Upload PATH to URL. AS :content (raw body) or :files (multipart field)."
   (declare (ignore client))
-  (let* ((http-keys (remove-from-plist keys :method :backend :content-type
-                                            :field-name :slurp :filesystem :as))
+  (let* ((trust-env (getf keys :trust-env t))
+         (http-keys (remove-from-plist keys :method :backend :content-type
+                                            :field-name :slurp :filesystem :as
+                                            :preferred :trust-env :cert
+                                            :default-params))
+         (http-keys (if (and trust-env
+                             (eq (getf http-keys :proxy :%missing) :%missing))
+                        (list* :proxy (make-http-proxy-config :system t) http-keys)
+                        http-keys))
          (backend (if backendp backend (ensure-http-backend)))
          (*http-backend* backend)
          (file (path-http-file path
@@ -175,10 +189,12 @@
                                :backend backend)))
     (ecase as
       (:content
-       (apply #'http:request method url :content file http-keys))
+       (apply #'http:request method url :content file
+              :backend backend http-keys))
       (:files
        (apply #'http:request method url
               :files (list (cons (or field-name "file") file))
+              :backend backend
               http-keys)))))
 
 (defun download-async (url path &rest keys
@@ -188,14 +204,21 @@
                        &allow-other-keys)
   "Async DOWNLOAD. Promise resolves to (PATH . RESPONSE)."
   (declare (ignore client))
-  (let* ((http-keys (remove-from-plist keys :overwrite :filesystem :create-parents
-                                            :backend))
+  (let* ((trust-env (getf keys :trust-env t))
+         (http-keys (remove-from-plist keys :overwrite :filesystem :create-parents
+                                            :backend :preferred :trust-env :cert
+                                            :slurp :default-params :raise-for-status))
+         (http-keys (if (and trust-env
+                             (eq (getf http-keys :proxy :%missing) :%missing))
+                        (list* :proxy (make-http-proxy-config :system t) http-keys)
+                        http-keys))
          (backend (if backendp backend (ensure-http-backend)))
          (*http-backend* backend)
          (path:*filesystem* (or filesystem path:*filesystem*))
          (dest (path:ensure-path path)))
     (blackbird:attach
-     (apply #'http:get-async url :force-binary t http-keys)
+     (apply #'http:get-async url :force-binary t
+            :backend backend http-keys)
      (lambda (response)
        (cons (%write-download dest (%response-octets response)
                               :overwrite overwrite
@@ -209,8 +232,15 @@
                      &allow-other-keys)
   "Async UPLOAD → Blackbird promise of HTTP-RESPONSE."
   (declare (ignore client))
-  (let* ((http-keys (remove-from-plist keys :method :backend :content-type
-                                            :field-name :slurp :filesystem :as))
+  (let* ((trust-env (getf keys :trust-env t))
+         (http-keys (remove-from-plist keys :method :backend :content-type
+                                            :field-name :slurp :filesystem :as
+                                            :preferred :trust-env :cert
+                                            :default-params))
+         (http-keys (if (and trust-env
+                             (eq (getf http-keys :proxy :%missing) :%missing))
+                        (list* :proxy (make-http-proxy-config :system t) http-keys)
+                        http-keys))
          (backend (if backendp backend (ensure-http-backend)))
          (*http-backend* backend)
          (file (path-http-file path
@@ -221,8 +251,10 @@
                                :backend backend)))
     (ecase as
       (:content
-       (apply #'http:request-async method url :content file http-keys))
+       (apply #'http:request-async method url :content file
+              :backend backend http-keys))
       (:files
        (apply #'http:request-async method url
               :files (list (cons (or field-name "file") file))
+              :backend backend
               http-keys)))))

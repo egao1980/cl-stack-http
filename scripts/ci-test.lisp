@@ -33,7 +33,7 @@
                (fboundp (find-symbol "PREPARE-REQUEST-BODY" :http-protocol))
                (fboundp (find-symbol "RESPONSE-DATA" :http-protocol))
                (macro-function (find-symbol "WITH-DATA-DESERIALIZER" :http-protocol)))
-    (error "http-protocol missing 0.2.0 API — need OCI http-protocol:0.2.0+")))
+    (error "http-protocol missing 0.2.1 API — need OCI http-protocol:0.2.1+")))
 
 (call-with-ci-muffles
  (lambda ()
