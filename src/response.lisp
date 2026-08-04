@@ -65,13 +65,18 @@
       (t (body-stream response)))))
 
 (defun map-response-bytes (response fn &key (chunk-size 8192))
-  "Call FN with successive octet chunks (httpx iter_bytes)."
+  "Call FN with successive octet chunks (httpx iter_bytes).
+
+   Resets then sets RESPONSE-BYTES-DOWNLOADED to octets read
+   (httpx num_bytes_downloaded). Safe after eager annotate."
   (check-type chunk-size (integer 1 *))
+  (setf (response-bytes-downloaded response) 0)
   (let* ((in (%response-input-stream response))
          (buf (make-array chunk-size :element-type '(unsigned-byte 8))))
     (loop for n = (read-sequence buf in)
           while (plusp n)
-          do (funcall fn (if (= n chunk-size)
+          do (incf (response-bytes-downloaded response) n)
+             (funcall fn (if (= n chunk-size)
                              (copy-seq buf)
                              (subseq buf 0 n))))))
 
