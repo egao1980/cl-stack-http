@@ -26,6 +26,8 @@ CLOS protocol: `auth-object-p` / `prepare-auth` / `handle-auth-response` (see `s
 
 OCI: `ghcr.io/egao1980/cl-systems/cl-stack-http:0.1.1`
 
+Cookbook (requests/httpx recipes): [`cl-stack` docs/cookbooks/http-client.md](https://github.com/egao1980/cl-stack/blob/main/docs/cookbooks/http-client.md).
+
 ## Quick start
 
 ```lisp
