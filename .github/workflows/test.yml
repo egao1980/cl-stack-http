@@ -14,7 +14,7 @@ env:
   SBCL_VERSION: 2.4.11
   ROSWELL_VERSION: "26.02.116"
   CL_REPOSITORY_CLIENT_IMAGE: "ghcr.io/egao1980/cl-repository/cl-repository-client"
-  CL_REPOSITORY_CLIENT_VERSION: "0.10.0"
+  CL_REPOSITORY_CLIENT_VERSION: "0.11.0"
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
