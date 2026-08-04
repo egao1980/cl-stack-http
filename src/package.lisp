@@ -24,16 +24,42 @@
    #:path-http-file
    #:coerce-upload
    #:coerce-files
+   #:effective-slurp
    #:download
    #:upload
    #:download-async
    #:upload-async
+   ;; response DX
+   #:response-content
+   #:response-text
+   #:response-json
+   #:response-ok-p
+   #:detect-encoding
+   #:charset-from-content-type
+   #:map-response-bytes
+   #:iter-bytes
+   #:map-response-lines
+   #:iter-lines
+   #:close-response
+   #:with-stream
+   #:raise-for-status
+   ;; auth / env
+   #:digest-auth
+   #:digest-auth-p
+   #:normalize-cert
+   #:parse-netrc
+   #:netrc-auth-for-url
+   #:compute-digest-authorization
    ;; session
    #:http-session
    #:http-session-p
    #:session-backend
    #:session-client
+   #:session-params
+   #:session-cert
+   #:session-trust-env-p
    #:make-session
+   #:close-session
    #:with-session
    #:session-request
    #:session-get
@@ -43,6 +69,16 @@
    #:session-delete
    #:session-head
    #:session-options
+   #:session-stream
+   #:session-request-async
+   #:session-get-async
+   #:session-post-async
+   #:session-put-async
+   #:session-patch-async
+   #:session-delete-async
+   #:session-head-async
+   #:session-options-async
+   #:session-stream-async
    ;; facade (requests-shaped)
    #:request
    #:get
@@ -58,6 +94,8 @@
    #:put-async
    #:patch-async
    #:delete-async
+   #:head-async
+   #:options-async
    #:json
    #:sexp
    #:stream

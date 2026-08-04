@@ -11,10 +11,10 @@ Package: `cl-stack-http` (nick `stack-http`).
 
 ```lisp
 ;; via cl-repository (OCI)
-(cl-repo:load-system "cl-stack-http" :version "0.1.0")
+(cl-repo:load-system "cl-stack-http" :version "0.1.1")
 ```
 
-OCI: `ghcr.io/egao1980/cl-systems/cl-stack-http:0.1.0`
+OCI: `ghcr.io/egao1980/cl-systems/cl-stack-http:0.1.1`
 
 ## Quick start
 
@@ -24,14 +24,19 @@ OCI: `ghcr.io/egao1980/cl-systems/cl-stack-http:0.1.0`
 (stack-http:with-backend (:dexador)          ; or :winhttp / :async / :auto
   (stack-http:with-session (s :base-url "https://httpbin.org")
     (stack-http:session-get s "/get")
-    (stack-http:session-post s "/post"
-                             :data '(("a" . 1))
-                             :data-type :json)))
+    (stack-http:session-post s "/post" :json '(("a" . 1)))
+    (stack-http:response-json
+     (stack-http:session-get s "/json"))))
 
 ;; pathlib upload / download
 (stack-http:with-backend (:dexador)
   (stack-http:download "https://example.com/x.bin" #p"/tmp/x.bin" :overwrite t)
   (stack-http:upload #p"/tmp/x.bin" "https://httpbin.org/post" :as :files))
+
+;; streaming
+(stack-http:with-backend (:dexador)
+  (stack-http:with-stream (r :get "https://example.com/")
+    (stack-http:map-response-lines r #'print)))
 ```
 
 ## Backend selection
@@ -54,8 +59,9 @@ On load, installs yason JSON + readable S-exp codecs into `http-protocol`
 `*json-encoder*` / `*data-serializers*`.
 
 ```lisp
-(stack-http:post url :data ht :data-type :json)
-(http-protocol:response-data res :json)
+(stack-http:post url :json ht)                 ; httpx json=
+(stack-http:response-json res)
+(stack-http:response-text res)                 ; charset-aware
 
 (stack-http:post url :data '(1 2 3) :data-type :sexp)
 (http-protocol:response-data res :sexp)
@@ -66,8 +72,16 @@ On load, installs yason JSON + readable S-exp codecs into `http-protocol`
 Wire bodies stay FS-free (`http-file`). This package bridges pathlib:
 
 - `path-http-file` / `coerce-files` — path → `http-file` (MIME via trivial-mimes)
+- httpx file tuples: `("name.txt" octets "text/plain")`
+- `:slurp :auto` — memory on dexador, stream otherwise
 - `download` / `upload` (+ `-async`) — GET/POST with pathlib write/read
-- facade `:files` / `:content` accept path designators
+
+## Session / auth / env
+
+- default timeout **5s**, `:trust-env t` → system/env proxy + `~/.netrc`
+- `:auth (digest-auth user pass)` — 401 Digest challenge retry (sync)
+- `:cert` → client cert paths on request `:extras`
+- `close-session` / `with-session` clears pool
 
 ## Layering
 

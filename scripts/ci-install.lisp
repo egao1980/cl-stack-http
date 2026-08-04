@@ -76,7 +76,8 @@
    (ci-fetch "quri")
    (dolist (n '("rove" "alexandria" "babel" "yason" "trivial-mimes"
                 "blackbird" "cl-cookie" "dexador" "chipz" "salza2"
-                "cl-unicode" "bordeaux-threads" "trivial-gray-streams"))
+                "cl-unicode" "bordeaux-threads" "trivial-gray-streams"
+                "ironclad" "quri"))
      (ci-ql n))))
 
 (format t "~&; ci: install phase done~%")
