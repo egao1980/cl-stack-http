@@ -137,17 +137,61 @@
            (path:with-auto-overwrite () (do-write)))))))
   dest)
 
+(defun %basename-from-url (url)
+  "Last path segment of URL, or \"download\"."
+  (let* ((u (quri:uri url))
+         (p (or (quri:uri-path u) "/"))
+         (slash (position #\/ p :from-end t))
+         (name (if slash (subseq p (1+ slash)) p)))
+    (if (and name (plusp (length name))) name "download")))
+
+(defun %directory-download-dest-p (dest)
+  "T when DEST is a directory pathname (trailing slash) or an existing dir."
+  (let ((pn (path:path-pathname dest)))
+    (or (path:directory-pathname-p dest)
+        (uiop:directory-pathname-p pn)
+        (ignore-errors (path:directory-p dest)))))
+
+(defun resolve-download-path (dest response &key filename url)
+  "Resolve final file path for DOWNLOAD.
+
+   FILENAME — string → use it; T / :content-disposition → require CD name;
+   NIL → if DEST is a directory, use Content-Disposition filename (RFC 6266),
+   else DEST as-is. Falls back to URL basename when DEST is a directory and
+   no CD name is present."
+  (let* ((dest (path:ensure-path dest))
+         (cd (content-disposition-filename
+              (response-header response "content-disposition")))
+         (dirp (%directory-download-dest-p dest))
+         (name (cond
+                 ((stringp filename) filename)
+                 ((or (eq filename t) (eq filename :content-disposition))
+                  (or cd
+                      (error 'http-protocol-error
+                             :message "Content-Disposition filename missing")))
+                 (dirp (or cd (and url (%basename-from-url url)) "download"))
+                 (t nil))))
+    (if name
+        (path:join dest name)
+        dest)))
+
 (defun download (url path &rest keys
                  &key (backend nil backendp) client
                    (overwrite nil) filesystem
                    (create-parents t)
+                   (filename nil)
                  &allow-other-keys)
-  "GET URL and write body octets to PATH (pathlib). Returns (values path response)."
+  "GET URL and write body octets to PATH (pathlib). Returns (values path response).
+
+   If PATH is a directory (trailing slash / existing dir), the file name comes
+   from Content-Disposition (filename / filename*), else the URL basename.
+   FILENAME string overrides; T / :content-disposition requires a CD name."
   (declare (ignore client))
   (let* ((trust-env (getf keys :trust-env t))
          (http-keys (remove-from-plist keys :overwrite :filesystem :create-parents
                                             :backend :preferred :trust-env :cert
-                                            :slurp :default-params :raise-for-status))
+                                            :slurp :default-params :raise-for-status
+                                            :filename))
          (http-keys (if (and trust-env
                              (eq (getf http-keys :proxy :%missing) :%missing))
                         (list* :proxy (make-http-proxy-config :system t) http-keys)
@@ -157,8 +201,10 @@
          (path:*filesystem* (or filesystem path:*filesystem*))
          (dest (path:ensure-path path))
          (response (apply #'http:get url :force-binary t
-                          :backend backend http-keys)))
-    (values (%write-download dest (%response-octets response)
+                          :backend backend http-keys))
+         (final (resolve-download-path dest response
+                                       :filename filename :url url)))
+    (values (%write-download final (%response-octets response)
                              :overwrite overwrite
                              :create-parents create-parents)
             response)))
@@ -201,13 +247,16 @@
                        &key (backend nil backendp) client
                          (overwrite nil) filesystem
                          (create-parents t)
+                         (filename nil)
                        &allow-other-keys)
-  "Async DOWNLOAD. Promise resolves to (PATH . RESPONSE)."
+  "Async DOWNLOAD. Promise resolves to (PATH . RESPONSE).
+   Same FILENAME / directory Content-Disposition rules as DOWNLOAD."
   (declare (ignore client))
   (let* ((trust-env (getf keys :trust-env t))
          (http-keys (remove-from-plist keys :overwrite :filesystem :create-parents
                                             :backend :preferred :trust-env :cert
-                                            :slurp :default-params :raise-for-status))
+                                            :slurp :default-params :raise-for-status
+                                            :filename))
          (http-keys (if (and trust-env
                              (eq (getf http-keys :proxy :%missing) :%missing))
                         (list* :proxy (make-http-proxy-config :system t) http-keys)
@@ -220,10 +269,12 @@
      (apply #'http:get-async url :force-binary t
             :backend backend http-keys)
      (lambda (response)
-       (cons (%write-download dest (%response-octets response)
-                              :overwrite overwrite
-                              :create-parents create-parents)
-             response)))))
+       (let ((final (resolve-download-path dest response
+                                           :filename filename :url url)))
+         (cons (%write-download final (%response-octets response)
+                                :overwrite overwrite
+                                :create-parents create-parents)
+               response))))))
 
 (defun upload-async (path url &rest keys
                      &key (method :post) (backend nil backendp) client

@@ -29,6 +29,7 @@
    #:upload
    #:download-async
    #:upload-async
+   #:resolve-download-path
    ;; response DX
    #:response-content
    #:response-text

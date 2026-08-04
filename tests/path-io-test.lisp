@@ -50,3 +50,15 @@
             (ok (probe-file p)))
         (error (e)
           (skip (format nil "network unavailable: ~A" e)))))))
+
+(deftest resolve-download-path-content-disposition
+  (let* ((res (make-instance 'http-response
+                             :status 200
+                             :headers (let ((h (make-hash-table :test #'equal)))
+                                        (setf (gethash "content-disposition" h)
+                                              "attachment; filename=\"AAPL.json\"")
+                                        h)
+                             :body #()))
+         (dir (path:ensure-path "/tmp/dl-out/" :directory t))
+         (final (resolve-download-path dir res :url "https://x/ignored.bin")))
+    (ok (string= "AAPL.json" (path:name final)))))
