@@ -25,7 +25,7 @@
                         out)))))))
 
 (let* ((name "cl-stack-http")
-       (version (env "PKG_VERSION" "0.1.4"))
+       (version (env "PKG_VERSION" "0.1.5"))
        (source-dir (uiop:ensure-directory-pathname
                     (env "PKG_SOURCE_DIR" (namestring (uiop:getcwd)))))
        (_ (sync-asdf-version! source-dir version))

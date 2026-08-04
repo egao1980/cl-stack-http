@@ -1,5 +1,5 @@
 (defsystem "cl-stack-http"
-  :version "0.1.4"
+  :version "0.1.5"
   :description "requests/httpx-like HTTP client over http-protocol (JSON/sexp, pathlib FS, selectable backends)"
   :author "egao1980"
   :license "MIT"
@@ -20,6 +20,7 @@
                (:file "path-io")
                (:file "auth")
                (:file "auth-protocol")
+               (:file "hooks")
                (:file "response")
                (:file "facade")
                (:file "session"))
@@ -34,6 +35,7 @@
                (:file "path-io-test")
                (:file "backend-test")
                (:file "session-test")
+               (:file "hooks-test")
                (:file "response-test")
                (:file "auth-test")
                (:file "dx-test"))
