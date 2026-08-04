@@ -120,6 +120,16 @@ requests `hooks=` / httpx `event_hooks=` → specialize on a client mixin:
 `send` / `send-async` `:around` invokes these for every `http-client`.
 Auth stays on `prepare-auth` / `handle-auth-response`.
 
+## Publish
+
+Source-only OCI publish is centralized in [`cl-stack-systems`](https://github.com/egao1980/cl-stack-systems)
+(`imports/cl-stack-http/qlfile` pin + shared `publish.yml`). Packaging metadata lives in the `.asd`
+(`auto-package-spec`):
+
+```bash
+gh workflow run publish.yml -R egao1980/cl-stack-systems -f import=cl-stack-http
+```
+
 ## License
 
 MIT
