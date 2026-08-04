@@ -20,20 +20,24 @@
                        (json t) (sexp t)
                        params cert
                        (trust-env t)
+                       (client-class 'http-client)
                        base-url headers cookie-jar auth retry
                        max-redirects proxy pool verify
                      &allow-other-keys)
   "Create an HTTP-SESSION.
 
    Defaults (httpx-ish): TIMEOUT 5.0 when omitted, TRUST-ENV T (env proxy + netrc).
-   PARAMS — default query alist. CERT — client certificate designator."
+   PARAMS — default query alist. CERT — client certificate designator.
+   CLIENT-CLASS — subclass of HTTP-CLIENT for CLOS hooks (PREPARE-REQUEST /
+   HANDLE-RESPONSE). Default HTTP-CLIENT."
   (declare (ignore base-url headers cookie-jar auth retry
                    max-redirects proxy pool verify))
   (let* ((backend (if backendp
                       (ensure-http-backend backend)
                       (ensure-http-backend preferred)))
          (client-keys (remove-from-plist keys :backend :preferred :json :sexp
-                                              :params :cert :trust-env))
+                                              :params :cert :trust-env
+                                              :client-class))
          (client-keys (if (eq (getf keys :timeout :%missing) :%missing)
                           (list* :timeout 5.0 client-keys)
                           client-keys))
@@ -41,7 +45,16 @@
            (if (and trust-env (eq (getf keys :proxy :%missing) :%missing))
                (list* :proxy (make-http-proxy-config :system t) client-keys)
                client-keys))
-         (client (apply #'make-http-client backend client-keys)))
+         (client (progn
+                   (unless (subtypep client-class 'http-client)
+                     (error 'http-protocol-error
+                            :message
+                            (format nil ":client-class ~S is not a subtype of HTTP-CLIENT"
+                                    client-class)))
+                   (let ((c (apply #'make-http-client backend client-keys)))
+                     (if (typep c client-class)
+                         c
+                         (change-class c client-class))))))
     (make-instance 'http-session
                    :backend backend
                    :client client

@@ -61,6 +61,9 @@
    #:handle-auth-response
    #:auth-retry-p
    #:copy-request-with-auth
+   ;; CLOS request/response hooks (httpx event_hooks shape)
+   #:prepare-request
+   #:handle-response
    ;; session
    #:http-session
    #:http-session-p
@@ -71,6 +74,7 @@
    #:session-trust-env-p
    #:make-session
    #:close-session
+   #:call-with-session
    #:with-session
    #:session-request
    #:session-get
