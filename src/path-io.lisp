@@ -152,9 +152,7 @@
      (lambda ()
        (loop for n = (read-sequence buf input)
              while (plusp n)
-             do (let ((chunk (if (= n buffer-size)
-                                 buf
-                                 (subseq buf 0 n))))
+             do (let ((chunk (subseq buf 0 n))) ; copy — FS may retain the vector
                   (if first
                       (progn
                         (path:write-bytes dest chunk)
@@ -260,7 +258,9 @@
 (defun %normalize-download-pair (entry)
   "Normalize ENTRY to (values url path). Accepts (url . path) or (url path)."
   (cond
-    ((and (consp entry) (not (consp (cdr entry))))
+    ((and (consp entry)
+          (not (null (cdr entry)))
+          (not (consp (cdr entry))))
      (values (car entry) (cdr entry)))
     ((and (consp entry) (alexandria:proper-list-p entry) (= 2 (length entry)))
      (values (first entry) (second entry)))
