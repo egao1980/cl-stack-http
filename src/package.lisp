@@ -20,6 +20,8 @@
    #:decode-sexp
    ;; mime
    #:guess-content-type
+   #:extension-for-content-type
+   #:ensure-filename-extension
    ;; path / FS
    #:path-http-file
    #:coerce-upload

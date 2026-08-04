@@ -39,6 +39,16 @@
 (deftest guess-content-type-json
   (ok (string= "application/json" (guess-content-type "foo.json"))))
 
+(deftest ensure-filename-extension-from-content-type
+  (ok (string= "AAPL.json"
+               (ensure-filename-extension "AAPL" "application/json; charset=utf-8")))
+  (ok (string= "AAPL.json"
+               (ensure-filename-extension "AAPL.json" "application/octet-stream")))
+  (ok (string= "report.html"
+               (ensure-filename-extension "report" "text/html")))
+  (ok (string= "plain"
+               (ensure-filename-extension "plain" nil))))
+
 (deftest download-strips-trust-env
   "Regression: :trust-env must not reach make-http-request initargs."
   (with-backend (:dexador)
@@ -61,4 +71,17 @@
                              :body #()))
          (dir (path:ensure-path "/tmp/dl-out/" :directory t))
          (final (resolve-download-path dir res :url "https://x/ignored.bin")))
+    (ok (string= "AAPL.json" (path:name final)))))
+
+(deftest resolve-download-path-content-type-extension
+  "URL basename without extension + Content-Type → MIME suffix."
+  (let* ((res (make-instance 'http-response
+                             :status 200
+                             :headers (let ((h (make-hash-table :test #'equal)))
+                                        (setf (gethash "content-type" h)
+                                              "application/json; charset=utf-8")
+                                        h)
+                             :body #()))
+         (dir (path:ensure-path "/tmp/dl-out/" :directory t))
+         (final (resolve-download-path dir res :url "https://x/api/AAPL")))
     (ok (string= "AAPL.json" (path:name final)))))
