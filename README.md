@@ -5,7 +5,7 @@ requests / httpx-shaped HTTP client for Common Lisp — thin DX layer over
 backends, JSON + S-expression serdes, and
 [`cl-stack-pathlib`](https://github.com/egao1980/cl-stack-pathlib) upload/download.
 
-Package: `cl-stack-http` (nick `stack-http`). **OCI: 0.1.6.**
+Package: `cl-stack-http` (nick `stack-http`). **OCI: 0.1.7.**
 
 ## Layering (Python-shaped)
 
@@ -26,11 +26,11 @@ Cookbook: [`cl-stack` docs/cookbooks/http-client.md](https://github.com/egao1980
 ## Install
 
 ```lisp
-(cl-repo:load-system "cl-stack-http" :version "0.1.6")
+(cl-repo:load-system "cl-stack-http" :version "0.1.7")
 ;; optional CE: http-encoding-chipz / http-encoding-brotli / http-encoding-zstd
 ```
 
-OCI: `ghcr.io/egao1980/cl-systems/cl-stack-http:0.1.6`
+OCI: `ghcr.io/egao1980/cl-systems/cl-stack-http:0.1.7`
 
 Pins often used with this facade: `http-protocol` **0.3.0**, backends
 `http-backend-async` **0.2.0** / `http-backend-dexador` **0.1.2** /
@@ -92,7 +92,7 @@ Wire bodies stay FS-free (`http-file`). This package bridges pathlib:
 - `path-http-file` / `coerce-files` — path → `http-file` (MIME via trivial-mimes)
 - httpx file tuples: `("name.txt" octets "text/plain")`
 - `:slurp :auto` — memory on dexador, stream otherwise
-- `download` / `upload` (+ `-async`) — GET/POST with pathlib write/read
+- `download` / `download-many` / `upload` (+ `-async`) — streamed GET/POST with pathlib write/read
 
 ## Session / auth / env
 
