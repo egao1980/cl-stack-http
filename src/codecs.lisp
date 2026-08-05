@@ -1,25 +1,15 @@
 (in-package #:cl-stack-http)
 
-;;; Default JSON (yason) + S-expression codecs for http-protocol serdes.
+;;; Default JSON via json-protocol (jzon backend) + S-expression codecs
+;;; for http-protocol serdes.
 
 (defun encode-json (data)
-  "Serialize DATA to a UTF-8 JSON string (yason)."
-  (with-output-to-string (out)
-    (let ((yason:*symbol-key-encoder* #'yason:encode-symbol-as-lowercase))
-      (cond
-        ((hash-table-p data) (yason:encode data out))
-        ((and (listp data) data (every #'consp data)
-              (every (lambda (c) (or (stringp (car c)) (symbolp (car c)))) data))
-         (yason:encode-alist data out))
-        (t (yason:encode data out))))))
+  "Serialize DATA to a UTF-8 JSON string (stack-json / jzon)."
+  (stack-json:encode data))
 
 (defun decode-json (octets-or-string)
-  "Parse JSON octets/string → Lisp (objects as hash-tables)."
-  (let ((s (etypecase octets-or-string
-             (string octets-or-string)
-             ((vector (unsigned-byte 8))
-              (babel:octets-to-string octets-or-string :encoding :utf-8)))))
-    (yason:parse s :object-as :hash-table)))
+  "Parse JSON octets/string → Lisp (objects as hash-tables; null → :null)."
+  (stack-json:decode octets-or-string))
 
 (defun encode-sexp (data)
   "Serialize DATA with PRINT — readable, *READ-EVAL*-safe decode."
@@ -70,7 +60,9 @@
     (setf *data-serializers* (acons :json #'encode-json
                                     (remove :json *data-serializers* :key #'car))
           *data-deserializers* (acons :json #'decode-json
-                                      (remove :json *data-deserializers* :key #'car))))
+                                      (remove :json *data-deserializers* :key #'car)))
+    ;; Keep json-protocol's http hooks in sync when present.
+    (ignore-errors (stack-json:install-http-json-hooks)))
   (when sexp
     (setf *data-serializers* (acons :sexp #'encode-sexp
                                     (remove :sexp *data-serializers* :key #'car))

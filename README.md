@@ -73,8 +73,9 @@ Pins often used with this facade: `http-protocol` **0.3.0**, backends
 
 ## Serdes
 
-On load, installs yason JSON + readable S-exp codecs into `http-protocol`
-`*json-encoder*` / `*data-serializers*`.
+On load, installs [`json-protocol`](https://github.com/egao1980/json-protocol)
+(jzon default) + readable S-exp codecs into `http-protocol`
+`*json-encoder*` / `*data-serializers*`. JSON `null` → `:null`.
 
 ```lisp
 (stack-http:post url :json ht)                 ; httpx json=

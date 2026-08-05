@@ -37,10 +37,11 @@
 
 (call-with-ci-muffles
  (lambda ()
-   (dolist (n '("rove" "alexandria" "babel" "yason" "trivial-mimes"
+   (dolist (n '("rove" "alexandria" "babel" "trivial-mimes"
                 "blackbird" "cl-cookie" "dexador" "chipz" "salza2"
                 "cl-unicode" "bordeaux-threads" "trivial-gray-streams"
-                "ironclad" "quri"))
+                "ironclad" "quri" "com.inuoe.jzon" "closer-mop"
+                "float-features" "json-protocol" "json-backend-jzon"))
      (unless (asdf:find-system n nil)
        (format t "~&; ci: ql fallback ~a~%" n)
        (ql:quickload n :silent t)))

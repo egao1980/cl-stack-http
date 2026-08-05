@@ -4,7 +4,8 @@
   (:shadow #:get #:delete #:stream)
   (:import-from #:alexandria #:remove-from-plist)
   (:local-nicknames (#:http #:http)
-                    (#:path #:cl-stack-pathlib))
+                    (#:path #:cl-stack-pathlib)
+                    (#:stack-json #:json-protocol))
   (:export
    ;; backend selection
    #:*preferred-backend*
