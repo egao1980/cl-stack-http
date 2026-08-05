@@ -30,7 +30,11 @@
      :also-tests t
      :sources '(("babel" :ql)
                 ("trivial-features" :ql)
-                ("cl-unicode" :ql)))))
+                ("cl-unicode" :ql)
+                ;; json-protocol transitive; prefer OCI when present
+                ("com.inuoe.jzon" :ql)
+                ("closer-mop" :ql)
+                ("float-features" :ql)))))
 
 (format t "~&; ci: install phase done~%")
 (uiop:quit 0)

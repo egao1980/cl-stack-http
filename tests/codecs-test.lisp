@@ -3,12 +3,13 @@
 (deftest json-roundtrip
   (install-default-codecs)
   (let* ((data (alexandria:alist-hash-table
-                '(("a" . 1) ("b" . "x")) :test #'equal))
+                '(("a" . 1) ("b" . "x") ("z" . :null)) :test #'equal))
          (wire (encode-json data))
          (back (decode-json wire)))
     (ok (search "\"a\"" wire))
     (ok (= 1 (gethash "a" back)))
-    (ok (string= "x" (gethash "b" back)))))
+    (ok (string= "x" (gethash "b" back)))
+    (ok (eq :null (gethash "z" back)))))
 
 (deftest json-via-http-protocol-serdes
   (install-default-codecs)
