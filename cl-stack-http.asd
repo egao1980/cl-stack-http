@@ -11,6 +11,12 @@
                "trivial-mimes"
                "quri"
                "cl-base64")
+  :properties
+  (:cl-repo
+   (:ci (:with ("http-backend-dexador")
+         :sources (("babel" :ql) ("trivial-features" :ql) ("cl-unicode" :ql)
+                   ("com.inuoe.jzon" :ql) ("closer-mop" :ql) ("float-features" :ql))
+         :load-before-test ("http-protocol" "cl-stack-pathlib" "http-backend-dexador"))))
   :serial t
   :pathname "src"
   :components ((:file "package")
