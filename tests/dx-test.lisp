@@ -13,7 +13,7 @@
                'http-protocol-error)))
 
 (deftest files-tuple-coerce
-  (let* ((octets (babel:string-to-octets "hi" :encoding :utf-8))
+  (let* ((octets (encoding-protocol:encode "hi" :encoding :utf-8))
          (file (coerce-upload `("note.txt" ,octets "text/plain")
                               :field-name "f"
                               :slurp t)))

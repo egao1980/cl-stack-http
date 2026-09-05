@@ -11,14 +11,14 @@
 
 (deftest response-text-charset
   (let ((res (%fake-response
-              :body (babel:string-to-octets "café" :encoding :utf-8)
+              :body (encoding-protocol:encode "café" :encoding :utf-8)
               :headers '(("content-type" . "text/plain; charset=utf-8")))))
     (ok (string= "café" (response-text res)))
     (ok (eq :utf-8 (detect-encoding res)))))
 
 (deftest response-json-helper
   (install-default-codecs)
-  (let* ((wire (babel:string-to-octets "{\"a\":1}" :encoding :utf-8))
+  (let* ((wire (encoding-protocol:encode "{\"a\":1}" :encoding :utf-8))
          (res (%fake-response
                :body wire
                :headers '(("content-type" . "application/json")))))
@@ -27,12 +27,12 @@
 
 (deftest iter-lines-splits
   (let* ((text (format nil "a~C~Cb~Cc" #\Return #\Newline #\Newline))
-         (res (%fake-response :body (babel:string-to-octets text :encoding :utf-8)
+         (res (%fake-response :body (encoding-protocol:encode text :encoding :utf-8)
                               :headers '(("content-type" . "text/plain; charset=utf-8")))))
     (ok (equal '("a" "b" "c") (iter-lines res)))))
 
 (deftest iter-bytes-chunks
-  (let* ((octets (babel:string-to-octets "abcdefgh" :encoding :utf-8))
+  (let* ((octets (encoding-protocol:encode "abcdefgh" :encoding :utf-8))
          (res (%fake-response :body octets))
          (chunks (iter-bytes res :chunk-size 3)))
     (ok (= 3 (length chunks)))

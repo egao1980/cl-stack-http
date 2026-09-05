@@ -7,7 +7,7 @@
   (%response-octets response))
 
 (defun charset-from-content-type (content-type)
-  "Parse charset= from a Content-Type header → babel encoding keyword or NIL."
+  "Parse charset= from a Content-Type header → encoding-protocol keyword or NIL."
   (when (and content-type (plusp (length content-type)))
     (let* ((s (string-downcase content-type))
            (pos (search "charset=" s :test #'char=)))
@@ -34,12 +34,12 @@
   "Decode response body as text (httpx r.text). Default UTF-8 / charset=."
   (let* ((enc (detect-encoding response encoding))
          (octets (response-content response)))
-    (handler-case (babel:octets-to-string octets :encoding enc)
+    (handler-case (encoding-protocol:decode octets :encoding enc)
       (error (e)
         (if errorp
             (error e)
             ;; Lenient fallback (mojibake possible) — matches httpx soft decode.
-            (babel:octets-to-string octets :encoding :iso-8859-1))))))
+            (encoding-protocol:decode octets :encoding :iso-8859-1))))))
 
 (defun response-json (response &optional (type :json) &key content-type)
   "Decode response body as JSON (httpx r.json)."
@@ -60,7 +60,7 @@
       ((typep body '(vector (unsigned-byte 8)))
        (make-octet-input-stream body))
       ((stringp body)
-       (make-octet-input-stream (babel:string-to-octets body :encoding :utf-8)))
+       (make-octet-input-stream (encoding-protocol:encode body)))
       ((null body) (make-octet-input-stream #()))
       (t (body-stream response)))))
 

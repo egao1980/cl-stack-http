@@ -33,7 +33,7 @@
 (defun %body-nbytes (body)
   (cond
     ((typep body '(vector (unsigned-byte 8))) (length body))
-    ((stringp body) (length (babel:string-to-octets body :encoding :utf-8)))
+    ((stringp body) (length (encoding-protocol:encode body)))
     ((null body) 0)
     (t nil)))                       ; stream / unknown — leave counter alone
 
