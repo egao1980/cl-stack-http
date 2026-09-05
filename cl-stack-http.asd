@@ -1,5 +1,5 @@
 (defsystem "cl-stack-http"
-  :version "0.1.8"
+  :version "0.1.9"
   :description "requests/httpx-like HTTP client over http-protocol (JSON/sexp, pathlib FS, selectable backends)"
   :author "egao1980"
   :license "MIT"
@@ -9,8 +9,7 @@
                "alexandria"
                "babel"
                "trivial-mimes"
-               "quri"
-               "cl-base64")
+               "quri")
   :properties
   (:cl-repo
    (:ci (:with ("http-backend-dexador")
