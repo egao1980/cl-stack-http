@@ -90,7 +90,7 @@ On load, installs [`json-protocol`](https://github.com/egao1980/json-protocol)
 
 Wire bodies stay FS-free (`http-file`). This package bridges pathlib:
 
-- `path-http-file` / `coerce-files` — path → `http-file` (MIME via trivial-mimes)
+- `path-http-file` / `coerce-files` — path → `http-file` (MIME via mime-protocol)
 - httpx file tuples: `("name.txt" octets "text/plain")`
 - `:slurp :auto` — memory on dexador, stream otherwise
 - `download` / `download-many` / `upload` (+ `-async`) — streamed GET/POST with pathlib write/read
