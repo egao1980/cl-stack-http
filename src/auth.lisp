@@ -72,7 +72,7 @@
   (%ensure-ironclad)
   (let* ((digest-sequence (find-symbol "DIGEST-SEQUENCE" :ironclad))
          (bytes->hex (find-symbol "BYTE-ARRAY-TO-HEX-STRING" :ironclad))
-         (octets (babel:string-to-octets string :encoding :utf-8))
+         (octets (encoding-protocol:encode string))
          (digest (funcall digest-sequence :md5 octets)))
     (funcall bytes->hex digest)))
 

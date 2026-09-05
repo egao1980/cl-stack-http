@@ -1,5 +1,5 @@
 (defsystem "cl-stack-http"
-  :version "0.1.10"
+  :version "0.1.11"
   :description "requests/httpx-like HTTP client over http-protocol (JSON/sexp, pathlib FS, selectable backends)"
   :author "egao1980"
   :license "MIT"
@@ -7,7 +7,7 @@
                "cl-stack-pathlib"
                "json-backend-jzon"
                "alexandria"
-               "babel"
+               "encoding-protocol"
                "mime-protocol"
                "quri")
   :properties

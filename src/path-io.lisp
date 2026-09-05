@@ -110,7 +110,7 @@
     (cond
       ((null body) #())
       ((typep body '(vector (unsigned-byte 8))) body)
-      ((stringp body) (babel:string-to-octets body :encoding :utf-8))
+      ((stringp body) (encoding-protocol:encode body))
       ((streamp body) (slurp-octets body))
       (t (slurp-octets (body-stream response))))))
 

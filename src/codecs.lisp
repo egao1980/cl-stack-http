@@ -26,14 +26,14 @@
   (let ((s (etypecase octets-or-string
              (string octets-or-string)
              ((vector (unsigned-byte 8))
-              (babel:octets-to-string octets-or-string :encoding :utf-8)))))
+              (encoding-protocol:decode octets-or-string)))))
     (with-standard-io-syntax
       (let ((*read-eval* nil)
             (*package* (find-package :cl-user)))
         (read-from-string s)))))
 
 (defmethod encode-http-data (data (type (eql :sexp)) content-type)
-  (let* ((octets (babel:string-to-octets (encode-sexp data) :encoding :utf-8))
+  (let* ((octets (encoding-protocol:encode (encode-sexp data)))
          (ct (or content-type "application/x-lisp; charset=utf-8")))
     (values octets ct (length octets))))
 
@@ -41,7 +41,7 @@
   (cond
     ((null body) #())
     ((typep body '(vector (unsigned-byte 8))) body)
-    ((stringp body) (babel:string-to-octets body :encoding :utf-8))
+    ((stringp body) (encoding-protocol:encode body))
     ((streamp body) (slurp-octets body))
     ((http-file-p body) (%body-octets (http-file-content body)))
     (t (error 'http-protocol-error

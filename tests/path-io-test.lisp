@@ -11,7 +11,7 @@
     (ok (http-file-p file))
     (ok (string= "hello.txt" (http-file-filename file)))
     (ok (string= "text/plain" (http-file-content-type file)))
-    (ok (equalp (babel:string-to-octets "hi" :encoding :utf-8)
+    (ok (equalp (encoding-protocol:encode "hi")
                 (http-file-content file)))))
 
 (deftest coerce-files-paths
