@@ -13,7 +13,6 @@
   :properties
   (:cl-repo
    (:ci (:with ("http-backend-dexador")
-         :sources (("mime-protocol" :oci))
          :load-before-test ("http-protocol" "cl-stack-pathlib" "http-backend-dexador"))))
   :serial t
   :pathname "src"
