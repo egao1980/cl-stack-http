@@ -1,5 +1,5 @@
 (defsystem "cl-stack-http"
-  :version "0.1.9"
+  :version "0.1.10"
   :description "requests/httpx-like HTTP client over http-protocol (JSON/sexp, pathlib FS, selectable backends)"
   :author "egao1980"
   :license "MIT"
@@ -8,11 +8,12 @@
                "json-backend-jzon"
                "alexandria"
                "babel"
-               "trivial-mimes"
+               "mime-protocol"
                "quri")
   :properties
   (:cl-repo
    (:ci (:with ("http-backend-dexador")
+         :sources (("mime-protocol" :oci))
          :load-before-test ("http-protocol" "cl-stack-pathlib" "http-backend-dexador"))))
   :serial t
   :pathname "src"

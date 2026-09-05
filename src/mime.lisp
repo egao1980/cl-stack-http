@@ -10,22 +10,15 @@
                  (path:path (or (path:name filename-or-path)
                                 (path:as-namestring filename-or-path)))))
          (mime (when (and name (plusp (length name)))
-                 (ignore-errors (trivial-mimes:mime name)))))
+                 (mime-protocol:lookup-mime name nil))))
     (or mime default "application/octet-stream")))
-
-(defun %media-type (content-type)
-  "Strip parameters from a Content-Type header value."
-  (when (and content-type (plusp (length content-type)))
-    (string-downcase
-     (string-trim '(#\Space #\Tab)
-                  (subseq content-type 0 (or (position #\; content-type)
-                                             (length content-type)))))))
 
 (defun extension-for-content-type (content-type)
   "Filename extension for CONTENT-TYPE (no leading dot), or NIL."
-  (let ((mt (%media-type content-type)))
-    (when mt
-      (ignore-errors (trivial-mimes:mime-file-type mt)))))
+  (when (and content-type (plusp (length content-type)))
+    (let ((mt (ignore-errors (mime-protocol:parse-media-type content-type))))
+      (when mt
+        (mime-protocol:lookup-extension (mime-protocol:media-type-essentials mt))))))
 
 (defun %filename-has-extension-p (name)
   "T when NAME has a non-empty extension after the last dot (not leading)."

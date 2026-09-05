@@ -201,7 +201,7 @@
    no CD name is present.
 
    When the chosen name has no extension, append one from the response
-   Content-Type (trivial-mimes), e.g. application/json → `.json`."
+   Content-Type (mime-protocol), e.g. application/json → `.json`."
   (let* ((dest (path:ensure-path dest))
          (cd (content-disposition-filename
               (response-header response "content-disposition")))
