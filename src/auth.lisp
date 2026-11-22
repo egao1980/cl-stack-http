@@ -64,49 +64,85 @@
           (push (read-value) out))))
     (nreverse out)))
 
-(defun %ensure-ironclad ()
-  (unless (find-package :ironclad)
-    (asdf:load-system "ironclad")))
+(defparameter *digest-algorithms*
+  '(("MD5" :md5 nil) ("MD5-SESS" :md5 t)
+    ("SHA-256" :sha256 nil) ("SHA-256-SESS" :sha256 t)
+    ("SHA-512-256" :sha512/256 nil) ("SHA-512-256-SESS" :sha512/256 t))
+  "RFC 7616 §3.3 algorithm token → (crypto-protocol digest, session-variant-p).")
 
-(defun %md5-hex (string)
-  (%ensure-ironclad)
-  (let* ((digest-sequence (find-symbol "DIGEST-SEQUENCE" :ironclad))
-         (bytes->hex (find-symbol "BYTE-ARRAY-TO-HEX-STRING" :ironclad))
-         (octets (encoding-protocol:encode string))
-         (digest (funcall digest-sequence :md5 octets)))
-    (funcall bytes->hex digest)))
+(defun %digest-algorithm (token)
+  "Map a challenge `algorithm` (absent ⇒ MD5) to (values digest sess-p).
+   Unknown tokens signal HTTP-PROTOCOL-ERROR rather than guessing."
+  (let ((entry (assoc (string-upcase (or token "MD5")) *digest-algorithms*
+                      :test #'string=)))
+    (unless entry
+      (error 'http-protocol-error
+             :message (format nil "unsupported Digest algorithm ~S" token)))
+    (values (second entry) (third entry))))
+
+(defun %digest-hex (algorithm string)
+  "Lower-case hex of ALGORITHM over the UTF-8 octets of STRING (RFC 7616 §3.4)."
+  (string-downcase
+   (encoding-protocol:encode
+    (crypto-protocol:digest (encoding-protocol:encode string) :algorithm algorithm)
+    :encoding :base16)))
+
+(defun %digest-qop (qop)
+  "Pick \"auth\" from the challenge's comma-separated QOP list, or NIL.
+   auth-int alone is not supported (it needs the entity body hash)."
+  (when qop
+    (let ((options (mapcar (lambda (s) (string-trim '(#\Space #\Tab) s))
+                           (uiop:split-string qop :separator ","))))
+      (cond
+        ((member "auth" options :test #'string-equal) "auth")
+        ((member "auth-int" options :test #'string-equal)
+         (error 'http-protocol-error
+                :message "Digest qop=auth-int is not supported"))
+        (t nil)))))
+
+(defun make-cnonce ()
+  "Fresh client nonce: 16 CSPRNG octets as hex (secrets-protocol)."
+  (secrets-protocol:token-hex 16))
 
 (defun compute-digest-authorization (username password method uri challenge
                                      &key (nc "00000001") cnonce)
-  "Build Authorization header value for a Digest challenge plist."
-  (let* ((realm (getf challenge :realm))
-         (nonce (getf challenge :nonce))
-         (opaque (getf challenge :opaque))
-         (qop (getf challenge :qop))
-         (algorithm (or (getf challenge :algorithm) "MD5"))
-         (cnonce (or cnonce (format nil "~8,'0x" (random (expt 2 32)))))
-         (ha1 (%md5-hex (format nil "~A:~A:~A" username realm password)))
-         (ha2 (%md5-hex (format nil "~A:~A" (string-upcase (string method)) uri)))
-         (response
-           (if (and qop (search "auth" qop :test #'char-equal))
-               (%md5-hex (format nil "~A:~A:~A:~A:~A:~A"
-                                 ha1 nonce nc cnonce "auth" ha2))
-               (%md5-hex (format nil "~A:~A:~A" ha1 nonce ha2))))
-         (parts (list (format nil "username=~S" username)
-                      (format nil "realm=~S" realm)
-                      (format nil "nonce=~S" nonce)
-                      (format nil "uri=~S" uri)
-                      (format nil "response=~S" response))))
-    (unless (string-equal algorithm "MD5")
-      (warn "cl-stack-http: Digest algorithm ~A treated as MD5" algorithm))
-    (when (and qop (search "auth" qop :test #'char-equal))
-      (setf parts (append parts
-                          (list "qop=auth"
-                                (format nil "nc=~A" nc)
-                                (format nil "cnonce=~S" cnonce)))))
-    (when opaque
-      (setf parts (append parts (list (format nil "opaque=~S" opaque)))))
-    (format nil "Digest ~{~A~^, ~}" parts)))
+  "Build the Authorization header value for a Digest challenge plist (RFC 7616).
+   Honours the challenge `algorithm` (MD5, SHA-256, SHA-512-256 and their
+   -sess variants) and qop=auth. CNONCE defaults to MAKE-CNONCE."
+  (multiple-value-bind (algorithm sess-p) (%digest-algorithm (getf challenge :algorithm))
+    (let* ((realm (getf challenge :realm))
+           (nonce (getf challenge :nonce))
+           (opaque (getf challenge :opaque))
+           (qop (%digest-qop (getf challenge :qop)))
+           (cnonce (or cnonce (make-cnonce)))
+           (ha1 (let ((base (%digest-hex algorithm
+                                         (format nil "~A:~A:~A" username realm password))))
+                  (if sess-p
+                      (%digest-hex algorithm (format nil "~A:~A:~A" base nonce cnonce))
+                      base)))
+           (ha2 (%digest-hex algorithm
+                             (format nil "~A:~A" (string-upcase (string method)) uri)))
+           (response
+             (if qop
+                 (%digest-hex algorithm (format nil "~A:~A:~A:~A:~A:~A"
+                                                ha1 nonce nc cnonce qop ha2))
+                 (%digest-hex algorithm (format nil "~A:~A:~A" ha1 nonce ha2))))
+           (parts (list (format nil "username=~S" username)
+                        (format nil "realm=~S" realm)
+                        (format nil "nonce=~S" nonce)
+                        (format nil "uri=~S" uri)
+                        (format nil "response=~S" response))))
+      (when (getf challenge :algorithm)
+        (setf parts (append parts
+                            (list (format nil "algorithm=~A" (getf challenge :algorithm))))))
+      (when (or qop sess-p)
+        (setf parts (append parts (list (format nil "cnonce=~S" cnonce)))))
+      (when qop
+        (setf parts (append parts (list (format nil "qop=~A" qop)
+                                        (format nil "nc=~A" nc)))))
+      (when opaque
+        (setf parts (append parts (list (format nil "opaque=~S" opaque)))))
+      (format nil "Digest ~{~A~^, ~}" parts))))
 
 (defun %www-authenticate (response)
   (response-header response "www-authenticate"))
