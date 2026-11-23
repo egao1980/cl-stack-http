@@ -15,9 +15,13 @@
                "quri")
   :properties
   (:cl-repo
-   (:ci (:with ("http-backend-dexador" "http-backend-async" "event-backend-libuv")
-         :load-before-test ("http-protocol" "cl-stack-pathlib" "http-backend-dexador"
-                            "http-backend-async" "event-backend-libuv"))))
+   (:ci (;; http-backend-dexador comes through the test system's :depends-on: an
+         ;; :with entry for it pulls dexador's (:version "uiop" "3.1.1") as a
+         ;; package and fails with 403 (egao1980/cl-repository#171).
+         :with ("http-backend-async" "event-backend-libuv")
+         :load-before-test ("cl-stack-ssl" "http-protocol" "cl-stack-pathlib"
+                            "http-backend-dexador" "http-backend-async"
+                            "event-backend-libuv"))))
   :serial t
   :pathname "src"
   :components ((:file "package")
