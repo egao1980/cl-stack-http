@@ -15,8 +15,9 @@
                "quri")
   :properties
   (:cl-repo
-   (:ci (:with ("http-backend-dexador")
-         :load-before-test ("http-protocol" "cl-stack-pathlib" "http-backend-dexador"))))
+   (:ci (:with ("http-backend-dexador" "http-backend-async" "event-backend-libuv")
+         :load-before-test ("http-protocol" "cl-stack-pathlib" "http-backend-dexador"
+                            "http-backend-async" "event-backend-libuv"))))
   :serial t
   :pathname "src"
   :components ((:file "package")
@@ -33,10 +34,11 @@
   :in-order-to ((test-op (test-op "cl-stack-http/tests"))))
 
 (defsystem "cl-stack-http/tests"
-  :depends-on ("cl-stack-http" "http-backend-dexador" "rove")
+  :depends-on ("cl-stack-http" "http-backend-dexador" "usocket" "bordeaux-threads" "rove")
   :pathname "tests"
   :serial t
   :components ((:file "package")
+               (:file "facade-surface-test")
                (:file "codecs-test")
                (:file "path-io-test")
                (:file "backend-test")
@@ -47,4 +49,5 @@
                (:file "auth-test")
                (:file "dx-test"))
   :perform (test-op (o c)
-             (symbol-call :rove :run c)))
+             (unless (symbol-call :rove :run c)
+               (error "tests failed for ~A" (component-name c)))))
