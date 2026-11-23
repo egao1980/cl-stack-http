@@ -5,7 +5,7 @@ requests / httpx-shaped HTTP client for Common Lisp — thin DX layer over
 backends, JSON + S-expression serdes, and
 [`cl-stack-pathlib`](https://github.com/egao1980/cl-stack-pathlib) upload/download.
 
-Package: `cl-stack-http` (nick `stack-http`). **OCI: 0.1.7.**
+Package: `cl-stack-http` (nick `stack-http`). **OCI: 0.2.0.**
 
 ## Layering (Python-shaped)
 
@@ -26,15 +26,15 @@ Cookbook: [`cl-stack` docs/cookbooks/http-client.md](https://github.com/egao1980
 ## Install
 
 ```lisp
-(cl-repo:load-system "cl-stack-http" :version "0.1.7")
+(cl-repo:load-system "cl-stack-http" :version "0.2.0")
 ;; optional CE: http-encoding-chipz / http-encoding-brotli / http-encoding-zstd
 ```
 
-OCI: `ghcr.io/egao1980/cl-systems/cl-stack-http:0.1.7`
+OCI: `ghcr.io/egao1980/cl-systems/cl-stack-http:0.2.0`
 
-Pins often used with this facade: `http-protocol` **0.3.0**, backends
-`http-backend-async` **0.2.0** / `http-backend-dexador` **0.1.2** /
-`http-backend-winhttp` **0.1.2**.
+Pins often used with this facade: `http-protocol` **0.4.3**, backends
+`http-backend-async` **0.2.28** + `event-backend-libuv` **0.2.3** /
+`http-backend-dexador` **0.1.5** / `http-backend-winhttp` **0.1.2**.
 
 ## Quick start
 
@@ -61,7 +61,7 @@ Pins often used with this facade: `http-protocol` **0.3.0**, backends
 
 | Prefer | System | Notes |
 |--------|--------|-------|
-| `:auto` | platform order | Windows: winhttp → async → dexador; else async/libuv preferred when present |
+| `:auto` | platform order | Windows: winhttp → async → dexador; elsewhere async → dexador. Async counts only when it has an event backend (libuv installed, or one you bound) |
 | `:dexador` | `http-backend-dexador` | sync HTTP/1.1 |
 | `:async` | `http-backend-async` | event-protocol; HTTP/2 when `http-protocol` asks |
 | `:winhttp` | `http-backend-winhttp` | Windows; HTTP/2 via WinHTTP |
@@ -69,6 +69,36 @@ Pins often used with this facade: `http-protocol` **0.3.0**, backends
 ```lisp
 (stack-http:ensure-http-backend :auto)
 (stack-http:with-backend (:winhttp) …)
+```
+
+`:async` (explicit or picked by `:auto`) needs no event-loop setup: it loads
+`event-backend-libuv` when installed and, when they are unset, sets
+`event-protocol:*event-backend*` and `http-backend-async:*event-backend-maker*`.
+The maker returns the bound `*event-backend*`, so a libev backend you bind is
+used instead. Your own maker or `*event-backend*` is never replaced. A
+blocking call makes a loop for itself and closes it; bind
+`event-protocol:*event-loop*` to run requests on your own loop.
+
+A backend system is ASDF-loaded once: later requests do not re-plan it
+(call `asdf:load-system` yourself to pick up edited sources).
+
+## Responses and conditions
+
+One package for the requests-shaped surface: the `http-protocol` response
+readers and conditions are re-exported (the same symbols), so
+`stack-http:response-status` reads with a single colon.
+
+| Kind | Symbols |
+|------|---------|
+| Response | `http-response` `response-status` `response-headers` `response-header` `response-body` `response-data` `response-url` `response-http-version` `response-cookies` `response-history` `response-request` `response-elapsed` `response-bytes-downloaded` `response-trailers` `body-stream` |
+| DX | `response-text` `response-json` `response-content` `response-ok-p` `raise-for-status` `with-stream` `iter-lines` … |
+| Conditions | `http-error` `http-protocol-error` `http-connection-error` `http-timeout-error` `http-tls-error` `http-redirect-error` `http-canceled` `http-incomplete-response` `http-status-error` (`http-status-error-status`, `http-status-error-response`) `http-client-error` `http-server-error` |
+| Transport | `make-http-timeout` `make-http-retry` `make-secret` `reveal` `*http-backend*` |
+
+```lisp
+(handler-case (stack-http:get "https://httpbin.org/status/404" :raise-for-status t)
+  (stack-http:http-status-error (e)
+    (stack-http:http-status-error-status e)))      ; => 404
 ```
 
 ## Serdes
@@ -123,12 +153,13 @@ Auth stays on `prepare-auth` / `handle-auth-response`.
 
 ## Publish
 
-Source-only OCI publish is centralized in [`cl-stack-systems`](https://github.com/egao1980/cl-stack-systems)
-(`imports/cl-stack-http/qlfile` pin + shared `publish.yml`). Packaging metadata lives in the `.asd`
-(`auto-package-spec`):
+The test workflow runs cl-repository's `test-system.yml`. It installs and
+preloads `http-backend-dexador`, `http-backend-async` and
+`event-backend-libuv`, and the test-op fails when Rove reports a failure.
+Source publish to GHCR runs from this repo:
 
 ```bash
-gh workflow run publish.yml -R egao1980/cl-stack-systems -f import=cl-stack-http
+gh workflow run publish-checkout.yml -R egao1980/cl-stack-http
 ```
 
 ## License
