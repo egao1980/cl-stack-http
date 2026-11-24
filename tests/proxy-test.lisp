@@ -17,18 +17,21 @@
 
 (defun %call-with-proxy-environment (bindings thunk)
   "THUNK with the proxy variables BINDINGS names ((name . value)) set and the
-   others blank, which http-protocol reads as unset. Restores them after (an
-   unset one comes back blank). *DEFAULT-PROXY-CONFIG* is rebound, so the
-   environment snapshot it caches is this one."
+   others blank, which http-protocol reads as unset. Every variable is blanked
+   before BINDINGS are set: on Windows http_proxy and HTTP_PROXY are one
+   variable. Restores them after (an unset one comes back blank).
+   *DEFAULT-PROXY-CONFIG* is rebound, so the environment snapshot it caches
+   is this one."
   (let ((saved (mapcar (lambda (name) (cons name (uiop:getenv name)))
                        *proxy-variables*))
         (*default-proxy-config* nil))
     (unwind-protect
-         (progn
-           (dolist (name *proxy-variables*)
-             (setf (uiop:getenv name)
-                   (or (cdr (assoc name bindings :test #'string=)) "")))
-           (funcall thunk))
+        (progn
+          (dolist (name *proxy-variables*)
+            (setf (uiop:getenv name) ""))
+          (loop for (name . value) in bindings
+                do (setf (uiop:getenv name) value))
+          (funcall thunk))
       (loop for (name . value) in saved
             do (setf (uiop:getenv name) (or value ""))))))
 
@@ -166,8 +169,11 @@
         (getf heads role)))
 
 (defun %proxy-test-backends ()
-  "dexador always; async too when its stack is installed."
-  (if (%async-stack-installed-p) '(:dexador :async) '(:dexador)))
+  "dexador, and async when its stack is installed. Not dexador on Windows:
+   there it runs over WinHTTP and refuses an explicit proxy
+   (UNSUPPORTED-OPERATION, http-backend-dexador)."
+  (remove nil (list #-(or windows win32) :dexador
+                    (and (%async-stack-installed-p) :async))))
 
 (deftest session-proxy-wins-under-trust-env
   (dolist (backend (%proxy-test-backends))
