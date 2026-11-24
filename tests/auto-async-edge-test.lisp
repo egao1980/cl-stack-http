@@ -17,35 +17,46 @@
 
 (defun %keep-alive-origin ()
   "Loopback HTTP/1.1 keep-alive origin, one thread per connection, every
-   request answered 200 \"ok\". → (values port stop-fn)"
+   request answered 200 \"ok\". → (values port stop-fn). STOP-FN wakes the
+   acceptor with a connection of its own before it closes the listener: on
+   Linux closing a socket does not end an accept() blocked on it in another
+   thread, so the join hung the ubuntu lane."
   (let* ((server (usocket:socket-listen "127.0.0.1" 0
                                         :reuse-address t :backlog 64
                                         :element-type '(unsigned-byte 8)))
-         (port (usocket:get-local-port server)))
+         (port (usocket:get-local-port server))
+         (stopping (list nil)))
     (labels ((serve (client)
                (handler-case
                    (unwind-protect
-                        (let ((stream (usocket:socket-stream client)))
-                          (loop while (%read-request-head stream)
-                                do (write-sequence
-                                    (%octets (format nil "HTTP/1.1 200 OK~C~CContent-Length: 2~C~C~C~Cok"
-                                                     #\Return #\Newline #\Return #\Newline
-                                                     #\Return #\Newline))
-                                    stream)
-                                   (finish-output stream)))
+                       (let ((stream (usocket:socket-stream client)))
+                         (loop while (%read-request-head stream)
+                               do (write-sequence
+                                   (%octets (format nil "HTTP/1.1 200 OK~C~CContent-Length: 2~C~C~C~Cok"
+                                                    #\Return #\Newline #\Return #\Newline
+                                                    #\Return #\Newline))
+                                   stream)
+                                  (finish-output stream)))
                      (ignore-errors (usocket:socket-close client)))
                  (error () nil)))
              (accept-loop ()
                (handler-case
                    (loop (let ((client (usocket:socket-accept server)))
+                           (when (car stopping)
+                             (ignore-errors (usocket:socket-close client))
+                             (return))
                            (bt:make-thread (lambda () (serve client))
                                            :name "cl-stack-http keep-alive conn")))
                  (error () nil))))
       (let ((acceptor (bt:make-thread #'accept-loop :name "cl-stack-http keep-alive origin")))
         (values port
                 (lambda ()
-                  (ignore-errors (usocket:socket-close server))
-                  (ignore-errors (bt:join-thread acceptor))))))))
+                  (setf (car stopping) t)
+                  (when (bt:thread-alive-p acceptor)
+                    (ignore-errors
+                      (usocket:socket-close (usocket:socket-connect "127.0.0.1" port))))
+                  (ignore-errors (bt:join-thread acceptor))
+                  (ignore-errors (usocket:socket-close server))))))))
 
 (defun %call-with-watchdog (seconds thunk)
   "THUNK on a new thread. → its value, the condition it signalled, or
