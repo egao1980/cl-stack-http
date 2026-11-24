@@ -61,7 +61,7 @@ Pins often used with this facade: `http-protocol` **0.4.3**, backends
 
 | Prefer | System | Notes |
 |--------|--------|-------|
-| `:auto` | platform order | Windows: winhttp → async → dexador; elsewhere async → dexador. Async counts only when it has an event backend (libuv installed, or one you bound) |
+| `:auto` | platform order | Windows: winhttp → async → dexador. Elsewhere blocking calls go dexador → async, and `-async` calls go async → dexador. Async counts only when it has an event backend (libuv installed, or one you bound) |
 | `:dexador` | `http-backend-dexador` | sync HTTP/1.1 |
 | `:async` | `http-backend-async` | event-protocol; HTTP/2 when `http-protocol` asks |
 | `:winhttp` | `http-backend-winhttp` | Windows; HTTP/2 via WinHTTP |
@@ -70,6 +70,18 @@ Pins often used with this facade: `http-protocol` **0.4.3**, backends
 (stack-http:ensure-http-backend :auto)
 (stack-http:with-backend (:winhttp) …)
 ```
+
+Why two orders: dexador blocks on the calling thread over a locked connection
+pool, so `get` from a thread pool is safe. A blocking call on the async
+backend runs a libuv loop of its own, and loops on several threads at once
+corrupt event-backend-libuv's handle tables
+([event-backend-libuv#31](https://github.com/egao1980/event-backend-libuv/issues/31)).
+`get-async` and the other `-async` calls need a backend with `send-async`,
+which dexador lacks, so they take the async backend. A session that `:auto`
+set up keeps dexador for its blocking calls and sends its `-async` calls
+through the async backend with the same client (cookies, headers,
+timeouts). Pass `:preferred :async` to use async for everything, HTTP/2 on
+blocking calls included (dexador is HTTP/1.1 only).
 
 `:async` (explicit or picked by `:auto`) needs no event-loop setup: it loads
 `event-backend-libuv` when installed and, when they are unset, sets

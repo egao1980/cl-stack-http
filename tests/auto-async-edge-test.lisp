@@ -111,8 +111,12 @@
                   (ok (and (= 24 n) (null bad))
                       (format nil ":dexador: ~D results, failures ~S" n bad))))
               (testing "requests in a thread pool: 8 threads x 3 GETs with the default :auto"
-                (ok (string-equal "async" (backend-name (ensure-http-backend :auto)))
-                    ":auto picks async here")
+                ;; The prosecution asserted ":auto picks async here" to show
+                ;; that async-first blocking :auto breaks under threads. The fix
+                ;; keeps blocking :auto dexador first until one libuv loop per
+                ;; thread is safe (event-backend-libuv#31).
+                (ok (string-equal "dexador" (backend-name (ensure-http-backend :auto)))
+                    "blocking :auto picks dexador here")
                 (multiple-value-bind (n bad) (%threaded-gets url :auto)
                   (ok (and (= 24 n) (null bad))
                       (format nil ":auto: ~D results, failures ~S" n bad)))))
@@ -147,4 +151,85 @@
                               seen)))))
                (ok (eql 200 res)
                    (format nil "blocking :auto GET inside a loop callback: ~A" res)))
+          (funcall stop)))))
+
+(defun %run-promises-on-libuv (thunk)
+  "Call THUNK on a fresh libuv loop; it returns a list of Blackbird promises.
+   The loop stops when all have settled (idle pooled connections would keep
+   it alive, http-backend-async#79). → the list of values / conditions (THUNK's
+   own error as a one-element list), or :HUNG after 10 s."
+  (%call-with-watchdog
+   10
+   (lambda ()
+     (let* ((eb (funcall (find-symbol "MAKE-LIBUV-BACKEND" :event-backend-libuv)))
+            (el (event-protocol:make-event-loop eb))
+            (results nil))
+       (unwind-protect
+           (event-protocol:with-event-backend (eb)
+             (event-protocol:with-event-loop-var (el)
+               (event-protocol:defer eb el
+                 (lambda ()
+                   (block deferred
+                     (let* ((promises (handler-case (funcall thunk)
+                                        (error (e)
+                                          (setf results (list e))
+                                          (event-protocol:stop eb el)
+                                          (return-from deferred))))
+                            (box (make-list (length promises) :initial-element :pending))
+                            (left (length promises)))
+                       (setf results box)
+                       (loop for p in promises
+                             for i from 0
+                             do (let ((i i))
+                                  (flet ((settle (v)
+                                           (setf (nth i box) v)
+                                           (when (zerop (decf left))
+                                             (event-protocol:stop eb el))))
+                                    (blackbird:catcher
+                                     (blackbird:attach p #'settle)
+                                     (error (e) (settle e))))))))))
+               (event-protocol:run eb el :stop-when-idle t)))
+         (ignore-errors (event-protocol:close-event-loop eb el)))
+       results))))
+
+(deftest auto-get-async-takes-the-async-backend
+  #+win32 (skip "Windows :auto is winhttp-first by design")
+  #-win32
+  (if (not (%async-stack-installed-p))
+      (skip +async-skip-message+)
+      (multiple-value-bind (port stop) (%keep-alive-origin)
+        (unwind-protect
+            (let ((url (format nil "http://127.0.0.1:~D/" port)))
+              (testing "three get-async calls with the default :auto (dexador has no SEND-ASYNC)"
+                (let ((res (%run-promises-on-libuv
+                            (lambda ()
+                              (loop repeat 3
+                                    collect (get-async url :timeout 5 :trust-env nil))))))
+                  (ok (and (listp res) (every (lambda (r) (and (typep r 'http-response)
+                                                               (= 200 (response-status r))))
+                                              res))
+                      (format nil "get-async x3: ~S" res))))
+              (testing "a default session: blocking calls on dexador, -async calls on async"
+                (let ((s (make-session :trust-env nil)))
+                  (unwind-protect
+                      (progn
+                        (ok (string-equal "dexador" (backend-name (session-backend s))))
+                        (ok (= 200 (response-status (session-get s url))) "session-get")
+                        (let ((res (%run-promises-on-libuv
+                                    (lambda () (list (session-get-async s url)
+                                                     (session-get-async s url))))))
+                          (ok (and (listp res)
+                                   (every (lambda (r) (and (typep r 'http-response)
+                                                           (= 200 (response-status r))))
+                                          res))
+                              (format nil "session-get-async x2: ~S" res))))
+                    (close-session s))))
+              (testing "a session made with an explicit backend keeps it for -async calls"
+                (let ((s (make-session :preferred :dexador :trust-env nil)))
+                  (unwind-protect
+                      (let ((res (%run-promises-on-libuv
+                                  (lambda () (list (session-get-async s url))))))
+                        (ok (and (listp res) (typep (first res) 'unsupported-operation))
+                            (format nil "dexador session-get-async: ~S" res)))
+                    (close-session s)))))
           (funcall stop)))))

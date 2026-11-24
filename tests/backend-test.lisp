@@ -57,8 +57,9 @@
       (skip +async-skip-message+)
       (with-function-replaced (cl-stack-http::%wire-async-event-context
                                (constantly nil))
-        (testing ":auto skips async when no event backend can be found"
-          (ok (string-equal "dexador" (backend-name (ensure-http-backend :auto)))))
+        (testing ":auto for -ASYNC calls skips async when no event backend can be found"
+          (ok (string-equal "dexador"
+                            (backend-name (cl-stack-http::%ensure-http-backend :auto t)))))
         (testing "an explicit :async is still made (the caller may bind its own loop)"
           (ok (string-equal "async" (backend-name (ensure-http-backend :async))))))))
 

@@ -88,15 +88,25 @@
     (ignore-errors (usocket:socket-close (usocket:socket-connect "127.0.0.1" port))))
   (bt:join-thread thread))
 
-(deftest auto-prefers-async-when-libuv-present
+(deftest auto-order-matches-readme
   #+win32 (skip "Windows :auto is winhttp-first by design")
   #-win32
   (if (not (%async-stack-installed-p))
       (skip +async-skip-message+)
-      (testing "README / QUICKSTART: :auto is async/libuv first off Windows"
-        (let ((b (ensure-http-backend :auto)))
-          (ok (string-equal "async" (backend-name b))
-              (format nil ":auto chose ~A, want async" (backend-name b)))))))
+      (progn
+        ;; #27 offered two fixes: make :auto async-first or fix the docs. An
+        ;; async-first blocking :auto broke requests from a thread pool
+        ;; (event-backend-libuv#31, test AUTO-ASYNC-GET-FROM-THREADS), so
+        ;; blocking calls keep dexador first and -ASYNC calls go async first;
+        ;; README and the cl-stack docs say so.
+        (testing "README: blocking :auto is dexador first off Windows"
+          (let ((b (ensure-http-backend :auto)))
+            (ok (string-equal "dexador" (backend-name b))
+                (format nil "blocking :auto chose ~A, want dexador" (backend-name b)))))
+        (testing "README: :auto for -ASYNC calls is async/libuv first"
+          (let ((b (cl-stack-http::%ensure-http-backend :auto t)))
+            (ok (string-equal "async" (backend-name b))
+                (format nil "async :auto chose ~A, want async" (backend-name b))))))))
 
 (deftest async-backend-needs-no-manual-event-maker
   (if (not (%async-stack-installed-p))

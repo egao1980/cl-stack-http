@@ -96,27 +96,31 @@
       (warn "cl-stack-http: backend ~S unavailable: ~A" name e)
       nil)))
 
-(defun %auto-backend-order ()
-  "Platform preference for :auto (README backend table). Windows: winhttp →
-   async → dexador. Elsewhere the stack's own async engine comes first (#27):
-   async (with an event backend, libuv by default) → dexador. ENSURE-HTTP-BACKEND
-   takes the first one available; async without an event backend is skipped."
-  #+win32 '(:winhttp :async :dexador)
-  #-win32 '(:async :dexador))
+(defun %auto-backend-order (&optional async)
+  "Platform preference for :auto (README backend table); ENSURE-HTTP-BACKEND
+   takes the first one available, and skips async when it has no event
+   backend. Windows: winhttp → async → dexador.
 
-(defun ensure-http-backend (&optional (prefer *preferred-backend*))
-  "Return an HTTP-BACKEND, loading systems as needed.
+   Elsewhere, blocking calls (REQUEST, GET, sessions, downloads) go dexador →
+   async: dexador blocks on the caller's thread over a locked pool, while a
+   blocking async call runs a libuv loop of its own, and loops on several
+   threads at once corrupt event-backend-libuv's handle tables
+   (event-backend-libuv#31), so requests from a thread pool failed. ASYNC
+   (REQUEST-ASYNC, GET-ASYNC, session -ASYNC calls) goes async → dexador: the
+   stack's event engine first, since dexador has no SEND-ASYNC (#27).
+   Kept behind this one function for the logic-family migration (#31)."
+  #+win32 (progn async '(:winhttp :async :dexador))
+  #-win32 (if async '(:async :dexador) '(:dexador :async)))
 
-   PREFER — :auto (platform order, see %AUTO-BACKEND-ORDER), :dexador, :async,
-   :winhttp, an HTTP-BACKEND instance, or NIL → *HTTP-BACKEND* then :auto.
-   :async (explicit, or chosen by :auto) also wires an event backend when
-   event-backend-libuv is installed, so blocking calls need no event loop."
+(defun %ensure-http-backend (prefer async)
+  "ENSURE-HTTP-BACKEND with the :auto order for blocking calls, or with ASYNC
+   true the order for -ASYNC calls (see %AUTO-BACKEND-ORDER)."
   (cond
    ((http-backend-p prefer) prefer)
    ((null prefer)
-    (or *http-backend* (ensure-http-backend :auto)))
+    (or *http-backend* (%ensure-http-backend :auto async)))
    ((eq prefer :auto)
-    (or (loop for name in (%auto-backend-order)
+    (or (loop for name in (%auto-backend-order async)
               for b = (%try-make-backend name :auto t)
               when b return b)
         (error 'http-protocol-error
@@ -127,6 +131,16 @@
                :message (format nil "backend ~S unavailable" prefer))))
    (t (error 'http-protocol-error
              :message (format nil "invalid backend prefer ~S" prefer)))))
+
+(defun ensure-http-backend (&optional (prefer *preferred-backend*))
+  "Return an HTTP-BACKEND for blocking calls, loading systems as needed.
+
+   PREFER — :auto (platform order, see %AUTO-BACKEND-ORDER: dexador first
+   off Windows), :dexador, :async, :winhttp, an HTTP-BACKEND instance, or
+   NIL → *HTTP-BACKEND* then :auto. REQUEST-ASYNC resolves :auto async first.
+   :async (explicit, or chosen by :auto) also wires an event backend when
+   event-backend-libuv is installed, so blocking calls need no event loop."
+  (%ensure-http-backend prefer nil))
 
 (defmacro with-backend ((&optional (prefer '*preferred-backend*)) &body body)
   "Bind *HTTP-BACKEND* (and keep *PREFERRED-BACKEND*) around BODY."
