@@ -10,7 +10,10 @@
    (cert :initarg :cert :accessor session-cert :initform nil)
    (trust-env :initarg :trust-env :accessor session-trust-env-p :initform t)
    (json :initarg :json :reader session-json-p :initform t)
-   (sexp :initarg :sexp :reader session-sexp-p :initform t)))
+   (sexp :initarg :sexp :reader session-sexp-p :initform t)
+   (auto :initarg :auto :reader session-auto-backend-p :initform nil
+         :documentation "True when :auto chose BACKEND: -ASYNC calls then take the
+          async :auto order (dexador, the blocking default, has no SEND-ASYNC).")))
 
 (defun http-session-p (x) (typep x 'http-session))
 
@@ -32,9 +35,9 @@
    HANDLE-RESPONSE). Default HTTP-CLIENT."
   (declare (ignore base-url headers cookie-jar auth retry
                    max-redirects proxy pool verify))
-  (let* ((backend (if backendp
-                      (ensure-http-backend backend)
-                      (ensure-http-backend preferred)))
+  (let* ((choice (if backendp backend preferred))
+         (auto (or (eq choice :auto) (and (null choice) (null *http-backend*))))
+         (backend (ensure-http-backend choice))
          (client-keys (remove-from-plist keys :backend :preferred :json :sexp
                                               :params :cert :trust-env
                                               :client-class))
@@ -62,7 +65,8 @@
                    :cert cert
                    :trust-env trust-env
                    :json json
-                   :sexp sexp)))
+                   :sexp sexp
+                   :auto auto)))
 
 (defun close-session (session)
   "Clear connection pool (httpx Client.close). Safe to call multiple times."
@@ -132,10 +136,17 @@
   (apply #'session-request session method url :want-stream t keys))
 
 (defun session-request-async (session method url &rest keys)
+  "SESSION-REQUEST as a Blackbird promise. A session whose backend :auto
+   chose sends -ASYNC calls through the async :auto order with the same
+   client (cookies, headers, timeouts), as REQUEST-ASYNC does."
   (call-with-session
    session
    (lambda (s)
-     (apply #'request-async method url (%session-call-keys s keys)))))
+     (let ((call-keys (%session-call-keys s keys)))
+       (when (session-auto-backend-p s)
+         (setf call-keys (list* :backend (%ensure-http-backend :auto t)
+                                (remove-from-plist call-keys :backend))))
+       (apply #'request-async method url call-keys)))))
 
 (defun session-get-async (session url &rest keys)
   (apply #'session-request-async session :get url keys))

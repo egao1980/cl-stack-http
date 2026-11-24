@@ -48,6 +48,46 @@
    #:close-response
    #:with-stream
    #:raise-for-status
+   ;; http-protocol re-exports (#26): one package for the requests-shaped
+   ;; surface, so (stack-http:response-status r) reads. Same symbols as
+   ;; http-protocol's, not new ones.
+   ;;   response
+   #:http-response
+   #:http-response-p
+   #:response-status
+   #:response-headers
+   #:response-header
+   #:response-body
+   #:response-data
+   #:response-url
+   #:response-http-version
+   #:response-cookies
+   #:response-history
+   #:response-request
+   #:response-elapsed
+   #:response-bytes-downloaded
+   #:response-trailers
+   #:body-stream
+   ;;   conditions
+   #:http-error
+   #:http-protocol-error
+   #:http-connection-error
+   #:http-timeout-error
+   #:http-tls-error
+   #:http-redirect-error
+   #:http-canceled
+   #:http-incomplete-response
+   #:http-status-error
+   #:http-status-error-status
+   #:http-status-error-response
+   #:http-client-error
+   #:http-server-error
+   ;;   transport policy (:timeout / :retry values), secrets, backend binding
+   #:make-http-timeout
+   #:make-http-retry
+   #:make-secret
+   #:reveal
+   #:*http-backend*
    ;; auth / env
    #:digest-auth
    #:digest-auth-p

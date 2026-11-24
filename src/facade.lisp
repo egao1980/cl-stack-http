@@ -172,8 +172,9 @@
                         default-params
                       &allow-other-keys)
   "Async request → Blackbird promise of HTTP-RESPONSE.
-   HANDLE-AUTH-RESPONSE (Digest/OAuth2 401 retry) is sync-only; PREPARE-AUTH runs."
-  (let* ((backend (if backendp backend (ensure-http-backend preferred)))
+   HANDLE-AUTH-RESPONSE (Digest/OAuth2 401 retry) is sync-only; PREPARE-AUTH runs.
+   :auto takes the async order (async first: dexador has no SEND-ASYNC)."
+  (let* ((backend (if backendp backend (%ensure-http-backend preferred t)))
          (*http-backend* backend)
          (auth (%resolve-auth auth url trust-env))
          (wire-auth (prepare-auth auth nil))
