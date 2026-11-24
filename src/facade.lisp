@@ -62,11 +62,18 @@
     (remove-from-plist keys :slurp :filesystem :preferred :cert
                             :trust-env)))
 
-(defun %resolve-proxy (proxy trust-env)
-  (cond
-    ((not trust-env) proxy)
-    (proxy proxy)
-    (t (make-http-proxy-config :system t))))
+(defun %resolve-proxy (proxy trust-env client)
+  "The :PROXY a facade request carries, or NIL to leave CLIENT's in charge
+   (http-protocol's EFFECTIVE-PROXY-CONFIG prefers the request's).
+
+   Precedence as in requests: the request's PROXY, then CLIENT's (a session
+   :PROXY, #34), then with TRUST-ENV the system config, read per request.
+   With none of them and TRUST-ENV NIL the config goes direct:
+   http-protocol's default config would read the environment again (#35)."
+  (or proxy
+      (unless (and client (http-client-proxy client))
+        (let ((trust (and trust-env t)))
+          (make-http-proxy-config :system trust :use-system-proxy trust)))))
 
 (defun %resolve-auth (auth url trust-env)
   (cond
@@ -96,6 +103,8 @@
    - :JSON → :DATA + :DATA-TYPE :JSON
    - :CERT client certificate (stored on :extras)
    - :TRUST-ENV T → env/system proxy + ~/.netrc basic auth when :AUTH omitted
+   - proxy precedence: this :PROXY, then the client's (a session :PROXY),
+     then the environment under :TRUST-ENV; :TRUST-ENV NIL never reads it
    - :AUTH (:DIGEST user pass) → 401 challenge retry (CLOS auth protocol)
    - :AUTH AUTH-OBJECT (e.g. cl-stack-oauth2:oauth2-auth) → PREPARE-AUTH + HANDLE-AUTH-RESPONSE
    - path / httpx file tuples in :FILES / :CONTENT"
@@ -103,7 +112,8 @@
          (*http-backend* backend)
          (auth (%resolve-auth auth url trust-env))
          (managedp (auth-object-p auth))
-         (proxy (%resolve-proxy (getf keys :proxy) trust-env))
+         (proxy (%resolve-proxy (getf keys :proxy) trust-env
+                                (if clientp client *http-client*)))
          (http-keys (%prepare-keys
                      (remove-from-plist keys :backend :preferred :slurp
                                              :filesystem :auth :cert
@@ -178,7 +188,8 @@
          (*http-backend* backend)
          (auth (%resolve-auth auth url trust-env))
          (wire-auth (prepare-auth auth nil))
-         (proxy (%resolve-proxy (getf keys :proxy) trust-env))
+         (proxy (%resolve-proxy (getf keys :proxy) trust-env
+                                (if clientp client *http-client*)))
          (http-keys (%prepare-keys
                      (remove-from-plist keys :backend :preferred :slurp
                                              :filesystem :auth :cert

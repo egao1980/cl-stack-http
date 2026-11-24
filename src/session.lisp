@@ -30,6 +30,9 @@
   "Create an HTTP-SESSION.
 
    Defaults (httpx-ish): TIMEOUT 5.0 when omitted, TRUST-ENV T (env proxy + netrc).
+   PROXY goes on the client and wins over the environment; a request's own
+   :PROXY wins over it (requests' Session.proxies). Without PROXY each request
+   reads the environment when TRUST-ENV.
    PARAMS — default query alist. CERT — client certificate designator.
    CLIENT-CLASS — subclass of HTTP-CLIENT for CLOS hooks (PREPARE-REQUEST /
    HANDLE-RESPONSE). Default HTTP-CLIENT."
@@ -44,10 +47,6 @@
          (client-keys (if (eq (getf keys :timeout :%missing) :%missing)
                           (list* :timeout 5.0 client-keys)
                           client-keys))
-         (client-keys
-           (if (and trust-env (eq (getf keys :proxy :%missing) :%missing))
-               (list* :proxy (make-http-proxy-config :system t) client-keys)
-               client-keys))
          (client (progn
                    (unless (subtypep client-class 'http-client)
                      (error 'http-protocol-error

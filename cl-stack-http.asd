@@ -1,5 +1,5 @@
 (defsystem "cl-stack-http"
-  :version "0.2.0"
+  :version "0.2.1"
   :description "requests/httpx-like HTTP client over http-protocol (JSON/sexp, pathlib FS, selectable backends)"
   :author "egao1980"
   :license "MIT"
@@ -52,7 +52,8 @@
                (:file "response-test")
                (:file "auth-test")
                (:file "dx-test")
-               (:file "auto-async-edge-test"))
+               (:file "auto-async-edge-test")
+               (:file "proxy-test"))
   :perform (test-op (o c)
              (unless (symbol-call :rove :run c)
                (error "tests failed for ~A" (component-name c)))))

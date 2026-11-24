@@ -140,6 +140,7 @@ Wire bodies stay FS-free (`http-file`). This package bridges pathlib:
 ## Session / auth / env
 
 - default timeout **5s**, `:trust-env t` → system/env proxy + `~/.netrc`
+- proxy precedence (requests-like): a request `:proxy` → the session's `:proxy` → the environment under `:trust-env`; `:trust-env nil` never reads `*_proxy` (0.2.1+)
 - `:auth '(:basic u p)` / `:auth '(:bearer tok)` — wire (http-protocol)
 - `:auth (digest-auth user pass)` — 401 Digest challenge retry (sync)
 - `:auth oauth2-auth` — load [`cl-stack-oauth2`](https://github.com/egao1980/cl-stack-oauth2)
